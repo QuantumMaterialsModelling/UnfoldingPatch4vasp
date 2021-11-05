@@ -10,7 +10,7 @@ _Electronic State Unfolding for Plane Waves: Energy Bands, Fermi Surfaces, and S
 This version supports the _bands4vasp_ external tool for an immediate analysis of unfolding calculations (see https://github.com/QuantumMaterialsModelling/bands4vasp ).
 
 Core routines were developed for previous VASP versions, as described in:\
-_Indirect-to-direct gap transition in strained and unstrained Sn$_x$Ge$_{1-x}$ alloys_, C. Eckhardt, K. Hummer, and G. Kresse, _Physical Review B_ 89(16), 165201 (2014), https://doi.org/10.1103/PhysRevB.89.165201} .
+_Indirect-to-direct gap transition in strained and unstrained Sn(x)Ge(1-x) alloys_, C. Eckhardt, K. Hummer, and G. Kresse, _Physical Review B_ 89(16), 165201 (2014), https://doi.org/10.1103/PhysRevB.89.165201} .
 
 ## Getting started
 
