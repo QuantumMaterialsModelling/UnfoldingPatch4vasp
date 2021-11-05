@@ -18,7 +18,7 @@ _Indirect-to-direct gap transition in strained and unstrained Sn(x)Ge(1-x) alloy
 
 1) Downaload the patch file (e.g., the vasp.6.2.1_U-patch.21.08 file) in the root directory of your vasp package.
 
-2) Apply the patch to execute the command:
+2) Apply the patch by executing the command:\
 patch -p0 < vasp.6.2.1_U-patch.21.08
         
 ### Usage
