@@ -1,0 +1,2590 @@
+Only in src: acfdt.F
+Only in src: acfdt_GG.F
+Only in src: aedens.F
+Only in src: afqmc.F
+Only in src: afqmc_struct.F
+Only in src: asa.F
+Only in src: auger.F
+Only in src: base.F
+Only in src: base_gpu.F
+Only in src: bext.F
+Only in src: brent.F
+Only in src: broyden.F
+Only in src: broyden.inc
+Only in src: bse.F
+Only in src: bse_te.F
+Only in src: c2f_interface.F
+Only in src: chain.F
+Only in src: charge.F
+Only in src: charge_gpu.F
+Only in src: chgloc.F
+Only in src: chi_base.F
+Only in src: chi.F
+Only in src: chi_GG.F
+Only in src: chi_glb.F
+Only in src: chi_super.F
+Only in src: choleski2.F
+Only in src: choleski2_gpu.F
+Only in src: cl_shift.F
+Only in src: constant.F
+Only in src: constant.inc
+Only in src: constr_cell_relax.F
+Only in src: constrmag.F
+Only in src: core_con_mat.F
+Only in src: core_rel.F
+Only in src: crpa.F
+Only in src: CUDA
+Only in src: cuda_fft.inc
+Only in src: cuda_interface.F
+Only in src: cuda_macros.inc
+Only in src: cuda_profiling.inc
+Only in src: david_inner.F
+Only in src: davidson.F
+Only in src: davidson_gpu.F
+Only in src: dfast.F
+Only in src: dfast_gpu.F
+Only in src: dgemmtest.F
+Only in src: diis.F
+Only in src: dimer_heyden.F
+Only in src: dipol.F
+Only in src: dmatrix.F
+Only in src: dmft.F
+Only in src: dos.F
+Only in src: dvvtrajectory.F
+Only in src: dyna.F
+Only in src: dynbr.F
+Only in src: dynconstr.F
+Only in src: ebs.F
+Only in src: egrad.F
+Only in src: electron_all.F
+Only in src: electron_common.F
+Only in src: electron.F
+Only in src: electron_gpu.F
+Only in src: electron_lhf.F
+Only in src: electron_OEP.F
+Only in src: elf.F
+Only in src: elinear_response.F
+Only in src: elphon.F
+Only in src: elpol.F
+Only in src: embed.F
+Only in src: extpot.F
+Only in src: extpot_glb.F
+Only in src: fast_aug.F
+Only in src: fcidump.F
+Only in src: fft3dbatched.F
+Only in src: fft3dcray.F
+Only in src: fft3dessl.F
+Only in src: fft3dessl+furth.F
+Only in src: fft3dfujitsu.F
+Only in src: fft3dfurth.F
+Only in src: fft3dfurth_f77.F
+Only in src: fft3dlib.F
+Only in src: fft3dlib_f77.F
+Only in src: fft3dnec.F
+Only in src: fft3dsimple.F
+Only in src: fft3dsimple_gpu.F
+Only in src: fftlib
+Only in src: fftmpi.F
+Only in src: fftmpi_map.F
+Only in src: fftmpiw.F
+Only in src: fftmpiw_gpu.F
+Only in src: ffttest.F
+Only in src: fftw3d.F
+Only in src: fftw3d+furth.F
+Only in src: fftw3d_gpu.F
+Only in src: fileio.F
+Only in src: finite_diff.F
+Only in src: fock_ace.F
+Only in src: fock_dbl.F
+Only in src: fock.F
+Only in src: fock_frc.F
+Only in src: fock_glb.F
+Only in src: fock_gpu.F
+Only in src: fock_multipole.F
+Only in src: force.F
+Only in src: gadget.inc
+Only in src: gauss_quad.F
+Only in src: GG_base.F
+Only in src: greens_orbital.F
+Only in src: greens_real_space.F
+Only in src: gridq.F
+Only in src: gw_model.F
+Only in src: hamil.F
+Only in src: hamil_gpu.F
+Only in src: hamil_lr.F
+Only in src: hamil_lrf.F
+Only in src: hamil_rot.F
+Only in src: hamil_struct.F
+Only in src: hills.inc
+Only in src: hyperfine.F
+Only in src: ilinear_response.F
+Only in src: incar_reader.F
+Only in src: incar_reader.inc
+Only in src: ini.F
+Only in src: internals.F
+Only in src: jacobi.F
+diff -ru src/k-proj.F src_Upatch/k-proj.F
+--- src/k-proj.F	2021-04-29 20:13:18.000000000 +0200
++++ src_Upatch/k-proj.F	2021-10-01 14:43:54.857954941 +0200
+@@ -11,479 +11,235 @@
+   USE prec
+   USE poscar
+   USE nonl_high
++  USE lattice
++  USE mkpoints
++  USE mymath
++  USE msymmetry
+ 
+   IMPLICIT none
+ 
+-  LOGICAL, SAVE :: LKPROJ
++  TYPE(latt), SAVE :: LATT_PRIM !basisvectors of primitive cell
++  LOGICAL, SAVE :: LKPROJ, KCONV, SLIM_PRJCAR, KT_EXIST=.FALSE.
+   REAL(q), SAVE :: KPROJ_THRESHOLD
++  REAL(q), DIMENSION(3,3), SAVE :: M_INV, M_NORM
+ 
+-CONTAINS
+-!**********************************************************************
+-!
+-! read all variables related to exchange correlation treatment
+-! from the INCAR file
+-! this set both the variables in the setex module and
+-! in the local fock module
+-!
+-!**********************************************************************
+-
+-  SUBROUTINE KPROJ_READER(IU5, IU0 )
+-      USE reader_tags
+-   
+-      IMPLICIT NONE
+-      INTEGER IU5, IU0
+-  ! local
+-      INTEGER IDUM, N, IERR
+-      REAL(q) RDUM
+-      COMPLEX(q) CDUM
+-      LOGICAL LOPEN,LDUM
+-      CHARACTER (1) :: CHARAC
+ 
+-      CALL OPEN_INCAR_IF_FOUND(IU5, LOPEN)
++  REAL(q), ALLOCATABLE :: KAPPA(:,:,:,:)
++  INTEGER, ALLOCATABLE :: INDEX_IN_IRZ(:), KAPPA_MAP(:,:)
++  INTEGER, SAVE :: NKPTS_PRIM
++  REAL(q), ALLOCATABLE :: VKPT(:,:)
+ 
+-      LKPROJ=.FALSE.
+-      CALL PROCESS_INCAR(LOPEN, IU0, IU5, 'LKPROJ', LKPROJ, IERR, WRITEXMLINCAR)
+-      
+-      KPROJ_THRESHOLD=1.E-2_q
+-      CALL PROCESS_INCAR(LOPEN, IU0, IU5, 'KPROJ_THRESHOLD', KPROJ_THRESHOLD, IERR, WRITEXMLINCAR)
+ 
+-      CALL CLOSE_INCAR_IF_FOUND(IU5)
++CONTAINS
+ 
+-    END SUBROUTINE KPROJ_READER
+ 
+-!=======================================================================
+-!  Read UNIT=15: POSCAR.prim file scan for total number of ions
+-!  and number of types
+-!  only T_INFO%NITYP is allocated at this point
+-!  all other arrays are allocated in RD_POSCAR
+-!=======================================================================
+ 
+-      SUBROUTINE RD_POSCAR_PRIM_HEAD(LATT_PRIM, T_INFO_PRIM, &
+-     &           NIOND,NIONPD, NTYPD,NTYPPD, IU0, IU6)
+-      USE prec
+-      USE lattice
+-      USE main_mpi
+ 
+-      IMPLICIT NONE
++!**********************  SUBROUTINE SETUP_KPROJ  ******************************
++! Get every parameter for the unfolding method in INCAR                       *
++! Get the lattice vector of the primitiv cell and the transformation matrix M *
++! Setup everything important for the unfolding method                         *
++!******************************************************************************
++
++SUBROUTINE SETUP_KPROJ(IO,LATT_CUR,T_INFO_PRIM,DYN_PRIM,LPPRIM,LKPRIM,LPRIMPOS,PRIM_CELL)
++  USE base
++  USE lattice
+ 
+-      INTEGER NIOND,NIONPD,NTYPPD,NTYPD
+-      INTEGER IU0,IU6
++! passed structures and variables
++  TYPE (latt) ::  LATT_CUR, LATT_TEMP    !super cell's
++  TYPE (in_struct) ::  IO
++  TYPE (dynamics) :: DYN_PRIM
++  TYPE (type_info) :: T_INFO_PRIM
++  TYPE (PRIM_CELL_T) :: PRIM_CELL
++! local variables and structures
++  INTEGER :: NIOND,NIONPD,NTYPD,NTYPPD,I,J
++  LOGICAL :: LPPRIM, LKPRIM, LPRIMPOS
++  REAL(q), DIMENSION(3,3) :: M_TERM
++! variables for RDATAb
++  INTEGER, DIMENSION(3,3) :: INTMUL
++  INTEGER :: INFO, NINFO, IERR, N=0
++  REAL(q) :: THIN=1E-7_q
++  REAL(q) :: RDUM, DET
++  COMPLEX(q) :: CDUM
++  LOGICAL :: LOPEN, LDUM
++  CHARACTER(1) :: CHARAC
++  INTEGER, DIMENSION(3) :: PIVOT
++  REAL(q), DIMENSION(3) :: WORK
++
++  LPRIMPOS=.FALSE.
++
++  CALL KPROJ_READER(IO%IU5, IO%IU0, LKPRIM)
++  ! quick return if possible
++  IF (.NOT. LKPROJ) RETURN
++
++  CALL RD_POSCAR_PRIM_HEAD(LATT_PRIM,T_INFO_PRIM,NIOND,NIONPD,NTYPD,NTYPPD,IO%IU0,IO%IU6,LPPRIM)
++  IF(LPPRIM)THEN
++     IF(NIOND<1)NIOND=1
++     ALLOCATE(T_INFO_PRIM%ATOMOM(3*NIOND))
++     CALL RD_POSCAR_PRIM(LATT_PRIM,T_INFO_PRIM,DYN_PRIM,NIOND,NIONPD,NTYPD,NTYPPD,IO%IU0,IO%IU6,LPRIMPOS)
++
++     CALL KPROJ_KMK(IO%IU0,TRANSPOSE(LATT_CUR%A),TRANSPOSE(LATT_PRIM%A) )
++     LATT_TEMP=LATT_PRIM
++     DO I=1,3
++       DO J=1,3
++         INTMUL(J,I)=NINT(REAL(M_NORM(I,J)))
++       END DO
++     END DO
++  ELSE
++    LOPEN=.TRUE. !true when file has not been opened yet
++    !read INTMUL from INCAR file
++    CALL RDATAB(LOPEN,'INCAR',IO%IU5,'INTMUL','=','#',';','I', &
++        &            INTMUL,RDUM,CDUM,LDUM,CHARAC,N,9,IERR)
++    IF ((IERR==0).AND.(N/=9)) THEN
++      IF(IO%IU0>=0)THEN
++        WRITE(IO%IU0,*)'ERROR: The number of elements of''INTMUL'' &
++              & from file INCAR are not 9.'
++        WRITE(IO%IU0,*) 'Stop calculation'
++      END IF
++      STOP
++    ELSE IF (IERR/=0) THEN
++        LATT_PRIM=PRIM_CELL%PRIM_LATT
++    CALL KPROJ_KMK(IO%IU0,TRANSPOSE(LATT_CUR%A),TRANSPOSE(LATT_PRIM%A) )
++
++        DO I=1,3
++          DO J=1,3
++            INTMUL(J,I)=NINT(REAL(M_NORM(I,J)))
++          END DO
++        END DO
++
++    END IF
++  END IF
++
++  CALL GET_LATT_INTMUL(IO,LATT_CUR,INTMUL)
++  IF(LPPRIM)THEN
++     TEST: DO I=1,3
++       DO J=1,3
++ IF (ABS(MOD(LATT_TEMP%A(I,J)-LATT_PRIM%A(I,J)+10.5_q,1._q)-0.5_q)>THIN)EXIT TEST
++       END DO
++     END DO TEST
++       IF(I>3)THEN
++         LATT_PRIM=LATT_TEMP
++       ELSE
++        IF(IO%IU0>=0)THEN
++        WRITE(IO%IU0,*) 
++        WRITE(IO%IU0,*)" =============================  W A R N I N G  =============================="
++        WRITE(IO%IU0,*)" |                                                                          |"
++        WRITE(IO%IU0,*)" |  Elements of the transformation matrix between the                       |"
++        WRITE(IO%IU0,*)" |  supercell lattice in POSCAR  and the primitive lattice in POSCAR.prim   |"
++        WRITE(IO%IU0,*)" |  are not integer (within the required precision).                        |"
++        WRITE(IO%IU0,*)" |                                                                          |"
++        WRITE(IO%IU0,*)" |  Unfolding calculation will recalculate the primitive lattice.           |"
++        WRITE(IO%IU0,*)" |  The new primitive lattice is printed in CONTCAR.prim file.              |"
++        WRITE(IO%IU0,*)" |                                                                          |"
++        WRITE(IO%IU0,*)" ============================================================================"
++        WRITE(IO%IU0,*) 
++        END IF
++       END IF
++
++  END IF
++
++  M_TERM=M_NORM
++  CALL DGECO(M_TERM, 3, 3, PIVOT, INFO, WORK)
++  CALL DGEDI(M_TERM, 3, 3, PIVOT, DET, WORK, '10')
++
++  !Adjust the PRIM_CELL struct for later purpose
++  PRIM_CELL%PRIM_LATT=LATT_PRIM
++  PRIM_CELL%NUM_PRIM_ATOMS=PRIM_CELL%NUM_SUPER_ATOMS / NINT(DET)
++  PRIM_CELL%NUM_CELLS=NINT(DET)
++  PRIM_CELL%SUPER_TO_PRIM=MATMUL(TRANSPOSE(LATT_PRIM%B),LATT_CUR%A)
++  PRIM_CELL%PRIM_TO_SUPER=MATMUL(TRANSPOSE(LATT_CUR%B),LATT_PRIM%A)
+ 
+-      TYPE (latt)::       LATT_PRIM
+-      TYPE (type_info) :: T_INFO_PRIM
+-      INTEGER NITYP(10000)          ! hard limit 10000 ions :->
+-      CHARACTER (LEN=2) TYPE(10000) ! type information
+-! temporary varibales
+-      CHARACTER (1)    CHARAC
+-      CHARACTER (255)  INPLIN,INPWRK
+-      INTEGER        NI,I,NT,NSCALE
+-      REAL(q)        SCALEX,SCALEY,SCALEZ
+-      INTEGER, EXTERNAL :: NITEMS
+-
+-! Now extract from file POSCAR how many ion types we have ...
+-      OPEN(UNIT=15,FILE=DIR_APP(1:DIR_LEN)//'POSCAR.prim',STATUS='OLD',ERR=1000)
+-
+-      READ(15,'(A1)',ERR=147,END=147) CHARAC
+-
+-! one scaling parameter or one for x, y and z
+-      READ(15,'(A)',ERR=147,END=147) INPLIN
+-! how many words/data items? --> number of ion types on file POSCAR!
+-      NSCALE=NITEMS(INPLIN,INPWRK,.TRUE.,'F')
+-      IF (NSCALE==1) THEN
+-         READ(INPLIN,*) LATT_PRIM%SCALE
+-         SCALEX=1
+-         SCALEY=1
+-         SCALEZ=1
+-      ELSE IF (NSCALE==3) THEN
+-         LATT_PRIM%SCALE=1
+-         READ(INPLIN,*) SCALEX,SCALEY,SCALEZ
+-      ELSE
+-         CALL vtutor%error("ERROR: there must be 1 or 3 items on line 2 of POSCAR.prim")
+-      ENDIF
+ 
+-      DO I=1,3
+-        READ(15,*,ERR=147,END=147) LATT_PRIM%A(1,I),LATT_PRIM%A(2,I),LATT_PRIM%A(3,I)
+-      ENDDO
+ 
+-      IF (LATT_PRIM%SCALE<0._q) THEN
+-!----alternatively give a volume (=abs(scale)) and adjust the lengths of
+-!----the three lattice vectors to get the correct desired volume ... :
+-         CALL LATTIC(LATT_PRIM)
+-         LATT_PRIM%SCALE=(ABS(LATT_PRIM%SCALE) &
+-     &                 / ABS(LATT_PRIM%OMEGA))**(1._q/3._q)
+-      ENDIF
+-      
+-      LATT_PRIM%A(1,:) =LATT_PRIM%A(1,:)*SCALEX*LATT_PRIM%SCALE
+-      LATT_PRIM%A(2,:) =LATT_PRIM%A(2,:)*SCALEY*LATT_PRIM%SCALE
+-      LATT_PRIM%A(3,:) =LATT_PRIM%A(3,:)*SCALEZ*LATT_PRIM%SCALE
+-         
+-      CALL LATTIC(LATT_PRIM)
+-
+-      IF (LATT_PRIM%OMEGA<0) THEN
+-        CALL vtutor%error("ERROR: the triple product of the basis vectors is negative exchange two &
+-           &basis vectors")
+-      ENDIF
++END SUBROUTINE SETUP_KPROJ
+ 
+-! 6th line, contains either the number of ions or their type
+-      READ(15,'(A)',ERR=147,END=147) INPLIN
+-! how many words/data items? --> number of ion types on file POSCAR!
+-      READ(INPLIN,*,ERR=147,END=147) CHARAC
+-      IF (.NOT.(CHARAC>='0' .AND. CHARAC<='9')) THEN
+-         T_INFO_PRIM%NTYP=NITEMS(INPLIN,INPWRK,.TRUE.,'A')
+-         READ(INPLIN,*,ERR=147,END=147) (TYPE(NI),NI=1,T_INFO_PRIM%NTYP)
+-         IF (IU0>=0) THEN
+-            WRITE(IU0,'(A,20A3)') ' POSCAR.prim found type information on POSCAR ',TYPE(1:T_INFO_PRIM%NTYP)
+-         ENDIF
+ 
+-         READ(15,'(A)',ERR=147,END=147) INPLIN
+-         IF (T_INFO_PRIM%NTYP/=NITEMS(INPLIN,INPWRK,.TRUE.,'I')) THEN
+-            CALL vtutor%error("ERROR: the type information is not consistent with the number of types")
+-         ENDIF
+-      ELSE
+-         T_INFO_PRIM%NTYP=NITEMS(INPLIN,INPWRK,.TRUE.,'I')
+-         TYPE(1:T_INFO_PRIM%NTYP+1)='  '
+-      ENDIF
+ 
+-      T_INFO_PRIM%NTYPP=T_INFO_PRIM%NTYP
+-! let me know how many ions
+-      READ(INPLIN,*,ERR=147,END=147) (NITYP(NI),NI=1,T_INFO_PRIM%NTYP)
+-! how many ions do we have on file POSCAR ... ?
+-      T_INFO_PRIM%NIONS=0
+-      DO NI=1,T_INFO_PRIM%NTYP
+-         T_INFO_PRIM%NIONS=T_INFO_PRIM%NIONS+NITYP(NI)
+-      END DO
+ 
+-! there might be empty spheres scan for them
+ 
+-      T_INFO_PRIM%NIONP=T_INFO_PRIM%NIONS
+-      T_INFO_PRIM%NTYPP=T_INFO_PRIM%NTYP
+ 
+-      READ(15,'(A1)',ERR=147,END=147) CHARAC
+-      IF ((CHARAC=='S').OR.(CHARAC=='s')) &
+-     &   READ(15,'(A1)',ERR=147,END=147) CHARAC
+-      DO NI=1,T_INFO_PRIM%NIONS
+-         READ(15,'(A1)',ERR=147,END=147) CHARAC
+-      END DO
+ 
+-      READ(15,'(A1)',ERR=147,END=147) CHARAC
+-      IF ((CHARAC=='E').OR.(CHARAC=='e')) THEN
+-! this is also important for us ...
+-         READ(15,'(A)',ERR=147,END=147) INPLIN
+-! how many words/data items? --> number of empty sphere types!
+-         T_INFO_PRIM%NTYPP=T_INFO_PRIM%NTYPP+NITEMS(INPLIN,INPWRK,.TRUE.,'I')
+-         READ(INPLIN,*) (NITYP(NT),NT=T_INFO_PRIM%NTYP+1,T_INFO_PRIM%NTYPP)
+-         DO NT=T_INFO_PRIM%NTYP+1,T_INFO_PRIM%NTYPP
+-           T_INFO_PRIM%NIONP=T_INFO_PRIM%NIONP+NITYP(NT)
+-         ENDDO
+-         TYPE(T_INFO_PRIM%NTYP+1:T_INFO_PRIM%NTYPP)='  '
+-      ENDIF
+-! ... precise details later in the program ...
+-  147 REWIND 15
+-! set the require allocation parameters
+ 
+-      NIOND =T_INFO_PRIM%NIONS
+-      NTYPD =T_INFO_PRIM%NTYP
+-      NIONPD=T_INFO_PRIM%NIONP
+-      NTYPPD=T_INFO_PRIM%NTYPP
+ 
+-      ALLOCATE(T_INFO_PRIM%NITYP(NTYPPD),T_INFO_PRIM%TYPE(NTYPPD))
+ 
+-      T_INFO_PRIM%NITYP(1:NTYPPD)=NITYP(1:NTYPPD)
+-      T_INFO_PRIM%TYPE(1:NTYPPD) =TYPE (1:NTYPPD)
+ 
+-      IF (IU0>=0) &
+-      WRITE(IU0,1) DIR_APP(1:DIR_LEN),NTYPPD,NIONPD
+ 
+-    1 FORMAT(' ',A,'POSCAR.prim found : ',I2,' types and ',I4,' ions' )
+ 
+-      CLOSE(UNIT=15)
+-      RETURN
+- 1000 CONTINUE
+-!
+-! all nodes report to unit 6 which have IU6 defined
+-! (guarantees that a sensible error message is allways written out)
+-!
+-      CALL vtutor%error("ERROR: the following files does not exist " // DIR_APP(1:DIR_LEN) // &
+-         " POSCAR.prim")
+-      END SUBROUTINE
+ 
+-!=======================================================================
++!**********************************************************************
+ !
+-!  Read UNIT=15: POSCAR Startjob and Continuation-job
++! read all variables related to exchange correlation treatment
++! from the INCAR file
++! this set both the variables in the setex module and
++! in the local fock module
+ !
+-!=======================================================================
++!**********************************************************************
+ 
+-      SUBROUTINE RD_POSCAR_PRIM(LATT_CUR, T_INFO, DYN, &
+-     &           NIOND,NIONPD, NTYPD,NTYPPD, &
+-     &           IU0,IU6)
+-      USE prec
+-      USE lattice
++  SUBROUTINE KPROJ_READER(IU5, IU0, LKPRIM )
++      USE reader_tags
+       USE main_mpi
+ 
+       IMPLICIT NONE
++      INTEGER :: IU5, IU0
++  ! local
++      INTEGER :: IDUM, N, IERR, IUK=14
++      REAL(q) :: RDUM
++      COMPLEX(q) :: CDUM
++      LOGICAL :: LOPEN,LDUM,LKPRIM
++      CHARACTER (1) :: CHARAC
+ 
+-      INTEGER NIOND,NIONPD,NTYPPD,NTYPD
+-      CHARACTER (255)  INPLIN,INPWRK
+-      INTEGER, EXTERNAL :: NITEMS
+-      TYPE (latt)::       LATT_CUR
+-      TYPE (type_info) :: T_INFO
+-      TYPE (dynamics)  :: DYN
+-      INTEGER IU0,IU6        ! io unit
+-! temporary
+-      CHARACTER (1)  CSEL
+-      INTEGER I,NT,NI,NSCALE
+-      REAL(q) SCALEX,SCALEY,SCALEZ
+-      REAL(q) POTIMR
+-
+-      OPEN(UNIT=15,FILE=DIR_APP(1:DIR_LEN)//'POSCAR.prim',STATUS='OLD')
+-
+-      IF (IU6>=0) WRITE(IU6,*)
+-!-----Basis vectors and scaling parameter ('lattice constant')
+-      READ(15,'(A40)') T_INFO%SZNAM2
+-      IF (IU6>=0) WRITE(IU6,*)'POSCAR.prim: ',T_INFO%SZNAM2
+-
+-! one scaling parameter or one for x, y and z
+-      READ(15,'(A)') INPLIN
+-! how many words/data items? --> number of ion types on file POSCAR!
+-      NSCALE=NITEMS(INPLIN,INPWRK,.TRUE.,'F')
+-      IF (NSCALE==1) THEN
+-         READ(INPLIN,*) LATT_CUR%SCALE
+-         SCALEX=1
+-         SCALEY=1
+-         SCALEZ=1
+-      ELSE IF (NSCALE==3) THEN
+-         LATT_CUR%SCALE=1
+-         READ(INPLIN,*) SCALEX,SCALEY,SCALEZ
+-      ELSE
+-         CALL vtutor%error("ERROR: there must be 1 or 3 items on line 2 of POSCAR.prim")
+-      ENDIF
+-
+-      DO I=1,3
+-        READ(15,*) LATT_CUR%A(1,I),LATT_CUR%A(2,I),LATT_CUR%A(3,I)
+-      ENDDO
+-
+-      IF (LATT_CUR%SCALE<0._q) THEN
+-!----alternatively give a volume (=abs(scale)) and adjust the lengths of
+-!----the three lattice vectors to get the correct desired volume ... :
+-         CALL LATTIC(LATT_CUR)
+-         LATT_CUR%SCALE=(ABS(LATT_CUR%SCALE)  &
+-     &                 / ABS(LATT_CUR%OMEGA))**(1._q/3._q)
+-      ENDIF
+-
+-      LATT_CUR%A(1,:) =LATT_CUR%A(1,:)*SCALEX*LATT_CUR%SCALE
+-      LATT_CUR%A(2,:) =LATT_CUR%A(2,:)*SCALEY*LATT_CUR%SCALE
+-      LATT_CUR%A(3,:) =LATT_CUR%A(3,:)*SCALEZ*LATT_CUR%SCALE
+-
+-      CALL LATTIC(LATT_CUR)
+-
+-      IF (LATT_CUR%OMEGA<0) THEN
+-        CALL vtutor%error("ERROR: the triple product of the basis vectors is negative exchange two &
+-           &basis vectors")
+-      ENDIF
+-
+-      T_INFO%NIOND =NIOND
+-      T_INFO%NIONPD=NIONPD
+-      T_INFO%NTYPD =NTYPD
+-      T_INFO%NTYPPD=NTYPPD
+-      ALLOCATE(T_INFO%LSFOR(3,NIOND),T_INFO%ITYP(NIOND))
+-
+-      T_INFO%LSFOR=.TRUE.
+-
+-!-----number of atoms per type
+-      READ(15,'(A)') INPLIN
+-
+-      READ(INPLIN,*) CSEL
+-      IF (.NOT.(CSEL>='0' .AND. CSEL<='9')) THEN
+-         READ(INPLIN,*) (T_INFO%TYPE(NI),NI=1,T_INFO%NTYP)
+-         READ(15,'(A)') INPLIN
+-         IF (T_INFO%NTYP/=NITEMS(INPLIN,INPWRK,.TRUE.,'I')) THEN
+-            CALL vtutor%error("ERROR: the type information is not consistent with the number of types")
+-         ENDIF
+-      ENDIF
++      CALL OPEN_INCAR_IF_FOUND(IU5, LOPEN)
+ 
+-      READ(INPLIN,*) (T_INFO%NITYP(NT),NT=1,T_INFO%NTYP)
+-!---- Set up the table from which we get type of each ion
+-      NI=1
+-      DO NT=1,T_INFO%NTYP
+-      DO NI=NI,T_INFO%NITYP(NT)+NI-1
+-        T_INFO%ITYP(NI)=NT
+-      ENDDO
+-      ENDDO
+-!
+-!   positions
+-!
+-      T_INFO%NIONS=0
+-      DO NT=1,T_INFO%NTYP
+-      T_INFO%NIONS= T_INFO%NIONS+ T_INFO%NITYP(NT)
+-      ENDDO
++      LKPROJ=.FALSE.
++      CALL PROCESS_INCAR(LOPEN, IU0, IU5, 'LKPROJ', LKPROJ, IERR, WRITEXMLINCAR)
+ 
+-      T_INFO%NIONP=T_INFO%NIONS
+ 
+-      IF (T_INFO%NIONS>NIOND) THEN
+-        CALL vtutor%error("ERROR: MAIN: increase NIOND " // str(T_INFO%NIONS))
+-      ENDIF
++      SLIM_PRJCAR=.TRUE.
++      CALL PROCESS_INCAR(LOPEN, IU0, IU5, 'SLIM_PRJCAR', SLIM_PRJCAR, IERR, WRITEXMLINCAR)
++      IF(IERR/=0) SLIM_PRJCAR=.TRUE.
++ 
++      
++      KPROJ_THRESHOLD=1.E-2_q
++      CALL PROCESS_INCAR(LOPEN, IU0, IU5, 'KPROJ_THRESHOLD', KPROJ_THRESHOLD, IERR, WRITEXMLINCAR)
+ 
+-      READ(15,'(A1)') CSEL
+-      T_INFO%LSDYN=((CSEL=='S').OR.(CSEL=='s'))
+-      IF (T_INFO%LSDYN) READ(15,'(A1)') CSEL
+-      IF (CSEL=='K'.OR.CSEL=='k'.OR. &
+-     &    CSEL=='C'.OR.CSEL=='c') THEN
+-        CSEL='K'
+-        IF (IU6>=0) &
+-        WRITE(IU6,*)' positions in cartesian coordinates'
++      IF(IERR==0) KT_EXIST=.TRUE.
+ 
+-        T_INFO%LDIRCO=.FALSE.
+-      ELSE
+-        IF (IU6>=0) &
+-        WRITE(IU6,*)' positions in direct lattice'
+-        T_INFO%LDIRCO=.TRUE.
+-      ENDIF
+ 
+-      ALLOCATE(DYN%POSION(3,NIONPD),DYN%POSIOC(3,NIONPD), &
+-     &         DYN%D2C(3,NIOND), &
+-     &         DYN%VEL(3,NIOND),DYN%D2(3,NIOND),DYN%D3(3,NIOND))
+-
+-! alias T_INFO%POSION
+-      T_INFO%POSION => DYN%POSION
+-      DYN%POSION=0
+-      DYN%VEL   =0
+-      DYN%D2    =0
+-      DYN%D2C   =0
+-      DYN%D3    =0
+-
+-      DO NI=1,T_INFO%NIONS
+-      IF (T_INFO%LSDYN) THEN
+-      READ(15,*,ERR=400,END=400) DYN%POSION(1,NI),DYN%POSION(2,NI),DYN%POSION(3,NI), &
+-     &      T_INFO%LSFOR(1,NI),T_INFO%LSFOR(2,NI),T_INFO%LSFOR(3,NI)
+-      ELSE
+-      READ(15,*,ERR=400,END=400) DYN%POSION(1,NI),DYN%POSION(2,NI),DYN%POSION(3,NI)
+-      ENDIF
+-      ENDDO
++      CALL CLOSE_INCAR_IF_FOUND(IU5)
+ 
+-      IF (CSEL=='K') THEN
+-        DYN%POSION(1,:)=LATT_CUR%SCALE*DYN%POSION(1,:)*SCALEX
+-        DYN%POSION(2,:)=LATT_CUR%SCALE*DYN%POSION(2,:)*SCALEY
+-        DYN%POSION(3,:)=LATT_CUR%SCALE*DYN%POSION(3,:)*SCALEZ
+-        
+-        CALL KARDIR(T_INFO%NIONS,DYN%POSION,LATT_CUR%B)
+-      ENDIF
+-      CALL TOPRIM(T_INFO%NIONS,DYN%POSION)
+-      DYN%POSIOC=DYN%POSION
++     OPEN(UNIT=IUK,FILE=DIR_APP(1:DIR_LEN)//'KPOINTS',STATUS='OLD',IOSTAT=IERR)
++     IF (IERR/=0) THEN
++       OPEN(UNIT=IUK,FILE='KPOINTS',STATUS='OLD',IOSTAT=IERR)
++     ENDIF
+ 
+-      DYN%INIT=0
+-      DYN%SNOSE(1)=1
+-!
+-!   empty spheres
+-!
+-      READ(15,'(A1)',ERR=424,END=410) CSEL
+-  424 IF ((CSEL=='E').OR.(CSEL=='e')) THEN
+-        IF (T_INFO%NTYPP>NTYPPD) THEN
+-         CALL vtutor%error("ERROR: MAIN: increase NEMPTY " // str(T_INFO%NTYPP-T_INFO%NTYP))
+-        ENDIF
+-        READ(15,*,ERR=410,END=410) (T_INFO%NITYP(NT),NT=T_INFO%NTYP+1,T_INFO%NTYPP)
+-        DO NT=T_INFO%NTYP+1,T_INFO%NTYPP
+-          T_INFO%NIONP=T_INFO%NIONP+T_INFO%NITYP(NT)
+-        ENDDO
+-        IF (T_INFO%NIONP>NIONPD) THEN
+-         CALL vtutor%error("ERROR: MAIN: increase NEMPTY " // str(T_INFO%NIONP-T_INFO%NIONS))
+-        ENDIF
+-        T_INFO%NIONP=T_INFO%NIONP
+ 
+-        DO NI=T_INFO%NIONS+1,T_INFO%NIONP
+-         READ(15,*,ERR=410,END=410) &
+-     &      DYN%POSION(1,NI),DYN%POSION(2,NI),DYN%POSION(3,NI)
+-        ENDDO
+-        IF (.NOT.T_INFO%LDIRCO) THEN
+-          DO NI=T_INFO%NIONS+1,T_INFO%NIONP
+-            DYN%POSION(1,NI)=LATT_CUR%SCALE*DYN%POSION(1,NI)*SCALEX
+-            DYN%POSION(2,NI)=LATT_CUR%SCALE*DYN%POSION(2,NI)*SCALEY
+-            DYN%POSION(3,NI)=LATT_CUR%SCALE*DYN%POSION(3,NI)*SCALEZ
+-            CALL KARDIR(1,DYN%POSION(1:3,NI),LATT_CUR%B)
+-          ENDDO
+-        ENDIF
+-        READ(15,'(A1)',ERR=425,END=410) CSEL
+-      ENDIF
+-      DYN%POSIOC=DYN%POSION
++     IF (IERR==0) THEN
++     ! no error, e.g. KPOINTS file exists
++    ! read it in the header
++      READ(IUK,*)
++      READ(IUK,*)
++      READ(IUK,'(A1)') CHARAC
+ 
+-  425 IF (CSEL=='K'.OR.CSEL=='k'.OR.CSEL==' ' &
+-     &    .OR.CSEL=='C'.OR.CSEL=='c') THEN
+-        CSEL='K'
+-        IF (IU6>=0) &
+-        WRITE(IU6,*)' velocities in cartesian coordinates'
+-      ELSE
+-        IF (IU6>=0) &
+-        WRITE(IU6,*)' velocities in direct lattice'
++      ! Searching 'p' character
++      IF (CHARAC=='P'.OR.CHARAC=='p') THEN
++        READ(IUK,'(A1)') CHARAC
++        KCONV=.TRUE.
+       ENDIF
+ 
+-!
+-!-----if we have velocities, read them in and transform from
+-!     cartesian coordinates to direct lattice
+-      DO NI=1,T_INFO%NIONS
+-        READ(15,*,ERR=410,END=410)  &
+-     &            DYN%VEL(1,NI),DYN%VEL(2,NI),DYN%VEL(3,NI)
+-        !tb start
+-        IF (CSEL=='K' .AND. DYN%IBRION/=44 ) THEN
+-        !IF (CSEL=='K') THEN
+-        !tb end
+-        CALL  KARDIR(1,DYN%VEL(1:3,NI),LATT_CUR%B)
+-        DYN%VEL(1:3,NI)=DYN%VEL(1:3,NI)*DYN%POTIM
+-        ENDIF
+-      ENDDO
+-      
+-!
+-!-----try to read in predictor Coordinates
+-!
+-      READ(15,*,ERR=430,END=430)
+-      READ(15,*,ERR=430,END=430) DYN%INIT
+-
+-!-----if INIT is there and it is 1 we have predictor-coordinates on the
+-!-----file so we can start with them
+-      IF (DYN%INIT==0) GOTO 430
+-      READ(15,*) POTIMR
+-      IF (POTIMR/=DYN%POTIM) THEN
+-        IF (IU6>=0) THEN
+-           WRITE(IU6,*)
+-           WRITE(IU6,*)' There are predictor-coordinates on the file.'
+-           WRITE(IU6,*)' we can''t use them due to change of POTIM!'
+-        ENDIF
+-        GOTO 430
++      IF (CHARAC=='L'.OR.CHARAC=='l') THEN
++        READ(14,'(A1)') CHARAC
+       ENDIF
+ 
+-!-----Read in Nose-Parameter
+-      READ(15,*) DYN%SNOSE
+-!-----Read in predictor-coordinates (always in direct lattice)
+-      READ(15,*) (DYN%POSION(1,NI),DYN%POSION(2,NI),DYN%POSION(3,NI),NI=1,T_INFO%NIONS)
+-      READ(15,*) (DYN%D2(1,NI),DYN%D2(2,NI),DYN%D2(3,NI),NI=1,T_INFO%NIONS)
+-      READ(15,*) (DYN%D3(1,NI),DYN%D3(2,NI),DYN%D3(3,NI),NI=1,T_INFO%NIONS)
+-      IF (IU6>=0) THEN
+-         WRITE(IU6,*)
+-         WRITE(IU6,*)' Using predictor-coordinates on the file'
++      IF (CHARAC=='K'.OR.CHARAC=='k'.OR. &
++      & CHARAC=='C'.OR.CHARAC=='c') THEN
++        IF(KCONV)LKPRIM=.TRUE.
+       ENDIF
+ 
+-      CLOSE(UNIT=15)
+-      RETURN
+-!-----------------------------------------------------------------------
+-!  Reading Inputfile 15 finished
+-!  if you end up at 430  INIT is set to 0,
+-!    INIT is used in the call to STEP  (predictors are not initialised)
+-!    in that way we tell STEP that it must initialize everything for us
+-!----------------------------------------------------------------------
+-  400 CONTINUE
+-      CALL vtutor%error("No initial positions read in")
+-
+-  410 CONTINUE
+-      DYN%INIT=-1
+-      IF (IU6>=0) &
+-      WRITE(IU6,*)' No initial velocities read in'
+-
+-      CLOSE(UNIT=15)
+-      RETURN
++     END IF
++     CLOSE(IUK)
+ 
+-  430 DYN%INIT=0
+-      CLOSE(UNIT=15)
+-      RETURN
++    END SUBROUTINE KPROJ_READER
+ 
+-      END SUBROUTINE
+ 
+ 
+ !***********************************************************************
+@@ -520,10 +276,124 @@
+     FIND_KPOINT_IN_PC=IND
+   END FUNCTION FIND_KPOINT_IN_PC
+ 
++
++
++!******************** SUBROUTINE KPROJ_KMK ***************************
++!This subroutine calculates the transformation matrix
++!***********************************************************************
++SUBROUTINE KPROJ_KMK(IU0, ASC, APC)
++ IMPLICIT NONE
++ REAL(q), DIMENSION(3,3)   :: ASC, APC_INV,APC
++ INTEGER :: I,J,IU0, NINFO=0
++
++!solve linear system A*a^-1=M
++  APC_INV=APC
++  CALL SVDINVERSE(APC_INV,3,NINFO)
++
++  IF (NINFO>0) THEN
++    IF (IU0>=0) WRITE(IU0,*) 'ERROR: The basisvectors of the primitive cell are linearly dependent'
++    STOP
++  END IF
++  DO I=1,3
++    DO J=1,3
++      M_NORM(I,J)=ASC(I,1)*APC_INV(1,J)+ASC(I,2)*APC_INV(2,J)+ASC(I,3)*APC_INV(3,J)
++    END DO
++  END DO
++  M_INV=M_NORM
++  CALL SVDINVERSE(M_INV,3,NINFO)
++
++  IF (NINFO>0) THEN
++    IF (IU0>=0) WRITE(IU0,*) 'ERROR: The transformation matrix M is singular'
++    STOP
++  END IF
++
++END SUBROUTINE KPROJ_KMK
++
++
++
++
++SUBROUTINE GET_LATT_INTMUL(IO,LATT_CUR,INTMUL)
++  USE base
++  USE lattice
++  USE prec
++  TYPE (latt) :: LATT_CUR
++  TYPE (in_struct) :: IO
++
++  REAL(q), DIMENSION(3,3) :: RINTMUL
++  INTEGER, DIMENSION(3,3) :: INTMUL
++  INTEGER :: I, J, NINFO
++
++  !Invert MATRIX INTMUL and call it INVMUL
++  DO i=1,3
++    DO j=1,3
++      RINTMUL(I,J)=REAL(INTMUL(J,I))*1.0_q
++    ENDDO
++  ENDDO
++  M_NORM=RINTMUL
++  CALL SVDINVERSE(RINTMUL,3,NINFO)
++  IF (NINFO>0) THEN
++    IF (IO%IU0>=0)THEN
++      WRITE(IO%IU0,*) 'ERROR: Matrix INTMUL is singular'
++      DO I=1,3
++        WRITE(IO%IU0,'(3I4)') INTMUL(:,I)
++      END DO
++      WRITE(IO%IU0,*) 'Stop calculation'
++    END IF
++    STOP
++  END IF
++  M_INV=RINTMUL
++
++  !calculate latice vectors of prim cell
++  DO I=1,3
++    DO J=1,3
++      LATT_PRIM%A(J,I)=M_INV(I,1)*LATT_CUR%A(J,1)+M_INV(I,2)*LATT_CUR%A(J,2)+M_INV(I,3)*LATT_CUR%A(J,3)
++    END DO
++  END DO
++
++  LATT_PRIM%SCALE=LATT_CUR%SCALE
++  CALL LATTIC(LATT_PRIM)
++
++END SUBROUTINE GET_LATT_INTMUL
++
++
++
++
++
++!******************** SUBROUTINE KPROJ_KCONVERTER ***************************
++SUBROUTINE KPROJ_KCONVERTER(LATT_CUR,IU0,IU6,KPOINTS)
++      USE lattice
++      USE main_mpi
++
++      IMPLICIT NONE
++! passed structures and variables
++      TYPE (latt) ::  LATT_CUR    !super cell's
++      TYPE (kpoints_struct) :: KPOINTS !in:PC. out:SC
++      REAL(q),ALLOCATABLE :: KPOINTS_PRIM_VKPT(:,:)
++      INTEGER :: IU0,IU6,I
++
++! conversion of KPOINTS
++
++      ALLOCATE(KPOINTS_PRIM_VKPT(3,KPOINTS%NKPTS))
++      DO I=1,KPOINTS%NKPTS
++       KPOINTS_PRIM_VKPT(:,I)=KPOINTS%VKPT(:,I)
++      ENDDO
++      DO I=1,KPOINTS%NKPTS
++       CALL CHANGE_BASIS(M_NORM,KPOINTS_PRIM_VKPT(:,I),KPOINTS%VKPT(:,I))
++      ENDDO
++
++      DEALLOCATE(KPOINTS_PRIM_VKPT)
++      RETURN
++END SUBROUTINE KPROJ_KCONVERTER
++
++
++
++
++
++
+ !**********************************************************************
+ !
+ !**********************************************************************
+-    SUBROUTINE KPROJ(IU5, IU0, IU6, GRID, LATT_CUR, W, SYM, CQIJ)
++      SUBROUTINE KPROJ(IU5, IU0, IU6, GRID, LATT_CUR, W, SYM, CQIJ, T_INFO_PRIM, DYN_PRIM,LPRIMPOS,LORBIT)
+       USE lattice
+       USE constant
+       USE msymmetry
+@@ -535,38 +405,44 @@
+       USE tutor, ONLY: vtutor, isAlert, KProjection
+ 
+       IMPLICIT NONE
++      INTEGER LORBIT
+       INTEGER IU5, IU0, IU6  ! units for IO
+       TYPE (wavespin)    :: W          ! wavefunction
+       TYPE (latt)        :: LATT_CUR 
+       TYPE (grid_3d)     :: GRID
+       TYPE (symmetry)    :: SYM
++      TYPE (dynamics)    :: DYN_PRIM
+       OVERLAP            :: CQIJ(:,:,:,:) ! overlap operator
+-      ! local
+-      TYPE (latt)        :: LATT_PRIM
+       TYPE (type_info)   :: T_INFO_PRIM
+-      TYPE (dynamics)    :: DYN_PRIM
++      ! local
+       INTEGER :: NIOND,NIONPD,NTYPD,NTYPPD
+-      INTEGER :: N1, N2, N3, IND
+-      INTEGER :: NK, KPT, NGVECTOR, NGVECTORM, NKPTS_PRIM, NKPTS_IRZ
++      INTEGER :: N1, N2, N3, IND, K, KPTB, CIND
++      INTEGER :: NK, KPT, NGVECTOR, NGVECTORM, NKPTS_IRZ
+       INTEGER :: ISP, N, I
+       REAL(q) :: TEMP
+       REAL(q) :: G1, G2, G3, GIX, GIY, GIZ, GX, GY, GZ
+       REAL(q) :: R1, R2, R3, K1, K2, K3, RS1, RS2, RS3
+-      REAL(q), ALLOCATABLE :: VKPT(:,:)      ! k-points in the BZ of primtive cell
+       REAL(q), ALLOCATABLE :: VKPT_IRZ(:,:)   
+       REAL(q), ALLOCATABLE :: WTKPT_IRZ(:)
+-      REAL(q), ALLOCATABLE :: KAPPA(:,:,:,:)
+-      INTEGER, ALLOCATABLE :: NKPTS_PRIM_INDEX(:,:), INDEX_IN_IRZ(:)
++      INTEGER, ALLOCATABLE :: GVEC_NUMBER(:,:),GVEC_MAP(:,:),GWORK(:,:)
+       TYPE (wavedes1)    WDES1
++      REAL(q) KAPPAnorm, DET
++      REAL(q), DIMENSION(3) :: KSCF, KSCF0
++      REAL(q), DIMENSION(3,3) :: M_TERM
++      LOGICAL :: CHOSEN
++      INTEGER :: KPT_PRIM, INFO, KAPPASIZE
++      INTEGER :: MAXGVEC, MAXGVECADD
++      INTEGER, DIMENSION(3) :: PIVOT
++      REAL(q), ALLOCATABLE :: KPT_WEIGHT(:)
++      REAL(q), DIMENSION(3) :: WORK
++      CHARACTER(3) :: ZONENAME
++      LOGICAL :: LPRIMPOS
++
+       INTEGER  ISYMOP,NROT,IGRPOP,NROTK,INVMAP,NPCELL,NB_GLOBAL,ISPINOR
+       REAL(q)  GTRANS, AP, SUM_KAPPA
+       COMMON /SYMM/   ISYMOP(3,3,48),NROT,IGRPOP(3,3,48),NROTK, &
+      &                GTRANS(3,48),INVMAP(48),AP(3,3),NPCELL
+ 
+-      CALL KPROJ_READER(IU5, IU0)
+-      ! quick return if possible
+-      IF (.NOT. LKPROJ) RETURN
+-
+ #ifdef MPI
+       IF (W%WDES%COMM_INB%NCPU /=1) THEN
+          CALL vtutor%write(isAlert, KProjection)
+@@ -576,41 +452,65 @@
+ 
+       IF (IU0>=0) THEN
+          WRITE(IU0,*) 'start k-points projection onto the first Brillouin zone of primitive cell.'
+-         WRITE(IU0,*) 'reading POSCAR.prim'
+       ENDIF
+-!=======================================================================
+-! read header of POSCAR.prim file to get NTYPD, NTYPDD, NIOND and NIONPD
+-!=======================================================================
+-      CALL RD_POSCAR_PRIM_HEAD(LATT_PRIM, T_INFO_PRIM, &
+-     &           NIOND, NIONPD, NTYPD,NTYPPD, IU0, IU6)
+ 
++
++    IF  (LPRIMPOS.AND.(.NOT.KCONV)) THEN
++
++      NIOND =T_INFO_PRIM%NIONS
++      NTYPD =T_INFO_PRIM%NTYP
++      NIONPD=T_INFO_PRIM%NIONP
++      NTYPPD=T_INFO_PRIM%NTYPP
+       ALLOCATE(T_INFO_PRIM%ATOMOM(3*NIOND))
+       T_INFO_PRIM%ATOMOM=0
+ 
+-      CALL RD_POSCAR_PRIM(LATT_PRIM, T_INFO_PRIM, DYN_PRIM, &
+-     &           NIOND, NIONPD, NTYPD,NTYPPD, IU0, IU6)
+-
+       IF (SYM%ISYM>0) THEN
++
+          CALL INISYM(LATT_PRIM%A, DYN_PRIM%POSION, DYN_PRIM%VEL, T_INFO_PRIM%LSFOR, &
+               T_INFO_PRIM%LSDYN,LPEAD_SYM_RED(),T_INFO_PRIM%NTYP,T_INFO_PRIM%NITYP,NIOND, &
+               SYM%PTRANS,SYM%NROT,SYM%NPTRANS,SYM%ROTMAP, &
+               SYM%TAU,SYM%TAUROT,SYM%WRKROT, &
+               SYM%INDROT,T_INFO_PRIM%ATOMOM,W%WDES%SAXIS,SYM%MAGROT,W%WDES%NCDIJ,IU6)
+-      ENDIF
+ 
++      ENDIF
++      ZONENAME='IRZ'
+       DEALLOCATE(T_INFO_PRIM%ATOMOM)
++    ELSE
++      IF (IU0>=0) WRITE(IU0,*) 'skip symmetry operation...'
++      ZONENAME='IBZ'
++    END IF
+ 
+       NGVECTORM=1
+       DO NK=1,W%WDES%NKPTS
+          NGVECTOR=W%WDES%NGVECTOR(NK)
+          NGVECTORM=MAX(NGVECTOR,NGVECTORM)
+-         !IF (IU0>=0) write(IU0,*) 'NK,NGVECTORM=', NK, NGVECTORM
+       ENDDO
+ 
+-      ALLOCATE(VKPT(3,NGVECTORM*W%WDES%NKPTS),NKPTS_PRIM_INDEX(NGVECTORM,W%WDES%NKPTS))
++      !estimate the maximal number of gvectors and kpoints
++      ! set KAPPASIZE (will stay like this for default case)
++      M_TERM=M_NORM
++      CALL DGECO(M_TERM, 3, 3, PIVOT, INFO, WORK)
++      CALL DGEDI(M_TERM, 3, 3, PIVOT, DET, WORK, '10')
++      KAPPASIZE=NINT(ABS(REAL(DET)))
++      IF(KCONV)THEN
++        MAXGVEC=NINT(1.0+REAL(NGVECTORM)/REAL(KAPPASIZE))
++        MAXGVECADD=MAX(NINT(0.05*MAXGVEC),20)
++        MAXGVEC=MAXGVEC+MAXGVECADD
++        ALLOCATE(GVEC_NUMBER(W%WDES%NKPTS,KAPPASIZE*W%WDES%NKPTS))
++        GVEC_NUMBER=0
++      ELSE
++        MAXGVEC=NGVECTORM
++      END IF
++
++
++
+ 
+-      VKPT=0
++      ALLOCATE(VKPT(3,NGVECTORM*W%WDES%NKPTS),GVEC_MAP(W%WDES%NKPTS,MAXGVEC))
++
++      VKPT=0.0_q
+       NKPTS_PRIM=0
++      GVEC_MAP=1
++      CHOSEN=.TRUE.
+ !=======================================================================
+ ! main loop over all special points
+ !=======================================================================
+@@ -649,40 +549,89 @@
+ ! find the corresponding K and make a list of k-vectors in prim cell
+ !=======================================================================
+             KPT=FIND_KPOINT_IN_PC(K1,K2,K3,VKPT,NKPTS_PRIM)
+-
+-            ! k-point not found in the existing list
+-            ! add the k-point to the list
+-            IF (KPT<0) THEN
+-               NKPTS_PRIM=NKPTS_PRIM+1
+-               VKPT(1,NKPTS_PRIM)=K1
+-               VKPT(2,NKPTS_PRIM)=K2
+-               VKPT(3,NKPTS_PRIM)=K3
+-               KPT=NKPTS_PRIM
+-            ENDIF
+-            NKPTS_PRIM_INDEX(IND,NK)=KPT
+-
++            IF (KCONV) THEN
++              CALL KPROJ_CHECK(W%WDES%VKPT(:,NK),(/ K1, K2, K3 /),CHOSEN,KSCF)
++            ELSE
++              KSCF=(/ K1, K2, K3 /)
++            END IF
++
++
++            IF (CHOSEN) THEN
++              ! k-point not found in the existing list
++              ! add the k-point to the list
++              IF (KPT<0) THEN
++                 NKPTS_PRIM=NKPTS_PRIM+1
++                 VKPT(1,NKPTS_PRIM)=K1
++                 VKPT(2,NKPTS_PRIM)=K2
++                 VKPT(3,NKPTS_PRIM)=K3
++                 KPT=NKPTS_PRIM
++              ENDIF
++
++              IF (KCONV) THEN
++                GVEC_NUMBER(NK,KPT)=GVEC_NUMBER(NK,KPT)+1
++                !if the size is to small, make it bigger
++                IF(GVEC_NUMBER(NK,KPT)>MAXGVEC)THEN
++                   ALLOCATE(GWORK(NK,MAXGVEC))
++                   DO KPTB=1,NK
++                     DO CIND=1,MAXGVEC
++                       GWORK(KPTB,CIND)=GVEC_MAP(KPTB,CIND)
++                     END DO
++                   END DO
++                   DEALLOCATE(GVEC_MAP)
++                   MAXGVEC=MIN(NGVECTORM,MAXGVEC+MAXGVECADD)
++                   ALLOCATE(GVEC_MAP(W%WDES%NKPTS,MAXGVEC))
++                   DO KPTB=1,NK
++                     DO CIND=1,SIZE(GWORK,2)
++                       GVEC_MAP(KPTB,CIND)=GWORK(KPTB,CIND)
++                     END DO
++                   END DO
++                   DEALLOCATE(GWORK)
++                END IF
++                GVEC_MAP(NK,GVEC_NUMBER(NK,KPT))=IND
++              ELSE
++                 GVEC_MAP(NK,IND)=KPT
++              END IF
++            END IF
+          ENDDO
+       ENDDO kpoint
+-      !IF (IU0>=0) WRITE(IU0,*) NKPTS_PRIM_INDEX
+       IF (IU0>=0) WRITE(IU0,*) 'K-point list is generated..'
+       IF (IU6>=0) WRITE(IU6,'(A,I6)') 'NKPTS_PRIM=', NKPTS_PRIM
+-      
++ 
++     
+       ALLOCATE(VKPT_IRZ(3,NKPTS_PRIM), INDEX_IN_IRZ(NKPTS_PRIM),WTKPT_IRZ(NKPTS_PRIM))
++      ALLOCATE(KPT_WEIGHT(NKPTS_PRIM))
++ 
+ 
+-      CALL IBZKPT_LIST(LATT_PRIM, VKPT, NKPTS_PRIM, VKPT_IRZ, NKPTS_IRZ, &
+-               INDEX_IN_IRZ, SYM%ROTMAP, SYM%MAGROT, SYM%ISYM, IU6, IU0)
+-      
++ 
++      IF(LPRIMPOS.AND.(.NOT.KCONV))THEN
++        CALL IBZKPT_LIST(LATT_PRIM, VKPT, NKPTS_PRIM, VKPT_IRZ,&
++         NKPTS_IRZ, INDEX_IN_IRZ, SYM%ROTMAP, SYM%MAGROT, &
++         SYM%ISYM, IU6, IU0, KPT_WEIGHT)
++        IF (IU0>=0) WRITE(IU0,*) 'Symmetry operation is done...'
++      ELSE
++        NKPTS_IRZ=NKPTS_PRIM
++         DO i=1,NKPTS_IRZ
++          VKPT_IRZ(:,i)=VKPT(:,i)
++          INDEX_IN_IRZ(i)=i
++        END DO
++      END IF
+       WTKPT_IRZ=0
+       DO NK=1,NKPTS_PRIM
+-         WTKPT_IRZ(INDEX_IN_IRZ(NK))=WTKPT_IRZ(INDEX_IN_IRZ(NK))+1
++       WTKPT_IRZ(INDEX_IN_IRZ(NK))=WTKPT_IRZ(INDEX_IN_IRZ(NK))+1
+       ENDDO
+ 
+-      IF (IU0>=0) WRITE(IU0,*) 'Symmetry operation is done...'
+-      !IF (IU0>=0) WRITE(IU0,*) INDEX_IN_IRZ
+-
+-      ALLOCATE(KAPPA(W%WDES%NB_TOT,W%WDES%NKPTS,W%WDES%ISPIN,NKPTS_IRZ))
++!if SLIM_PRJCAR is not activated everything will be calculated (old case)
++!default case already set: KAPPASIZE=INT(DET)
++!If P is activated -> there is a linear mapping
++      IF(KCONV) THEN
++        KAPPASIZE=1
++      END IF
+ 
++      ALLOCATE(KAPPA_MAP(W%WDES%NKPTS,NKPTS_IRZ))
++      ALLOCATE(KAPPA(W%WDES%NB_TOT,W%WDES%NKPTS,W%WDES%ISPIN,KAPPASIZE))
+       KAPPA=0
++      KAPPA_MAP=0
++
+ !=======================================================================
+ ! loop over k-points and bands
+ !=======================================================================
+@@ -698,22 +647,52 @@
+ ! to the array Kappa that has the size of the number of k-points
+ !=======================================================================
+          DO ISPINOR=0,WDES1%NRSPINORS-1
+-         DO IND=1,NGVECTOR
+-            KPT=INDEX_IN_IRZ(NKPTS_PRIM_INDEX(IND,NK))
+-            IF (KPT==0) THEN
+-               CALL vtutor%bug("internal error in KPROJ: G vector was not assigned to k-vector " // &
++
++           IF (KCONV) THEN
++             kpointprim:  DO KPTB=1,NKPTS_PRIM
++               IF(GVEC_NUMBER(NK,KPTB)==0) CYCLE kpointprim
++               KPT=INDEX_IN_IRZ(KPTB)
++               IF (KPT==0) THEN
++                 CALL vtutor%bug("internal error in KPROJ: G vector was not assigned to k-vector " // &
+                   str(W%WDES%IGX(IND,NK)) // " " // str(W%WDES%IGY(IND,NK)) // " " // &
+                   str(W%WDES%IGZ(IND,NK)), __FILE__, __LINE__)
+-            ENDIF
+-            TEMP=REAL(W%CPTWFP(IND+ISPINOR*NGVECTOR,N,NK,ISP)*CONJG(W%CPTWFP(IND+ISPINOR*NGVECTOR,N,NK,ISP)))
+-            KAPPA(NB_GLOBAL,NK,ISP,KPT)=KAPPA(NB_GLOBAL,NK,ISP,KPT)+TEMP
+-         ENDDO
++               ENDIF
++               KAPPA_MAP(NK,KPT)=1
++
++               gvector: DO CIND=1,GVEC_NUMBER(NK,KPTB)
++                 IND=GVEC_MAP(NK,CIND)
++
++                 TEMP=REAL(W%CPTWFP(IND+ISPINOR*NGVECTOR,N,NK,ISP)*CONJG(W%CPTWFP(IND+ISPINOR*NGVECTOR,N,NK,ISP)))
++                 KAPPA(NB_GLOBAL,NK,ISP,KAPPA_MAP(NK,KPT))=KAPPA(NB_GLOBAL,NK,ISP,KAPPA_MAP(NK,KPT))+TEMP
++               ENDDO gvector
++             END DO kpointprim
++           ELSE
++
++             DO IND=1,NGVECTOR
++               KPT=INDEX_IN_IRZ(GVEC_MAP(NK,IND))
++               IF (KPT==0) THEN
++                 WRITE(0,*) 'internal error in KPROJ: G vector was not assigned to k-vector', &
++                 W%WDES%IGX(IND,NK),W%WDES%IGY(IND,NK),W%WDES%IGZ(IND,NK)
++                 STOP
++               ENDIF
++
++                 IF(KAPPA_MAP(NK,KPT)==0)  KAPPA_MAP(NK,KPT)=MAXVAL(KAPPA_MAP(NK,:))+1
++
++               TEMP=REAL(W%CPTWFP(IND+ISPINOR*NGVECTOR,N,NK,ISP)*CONJG(W%CPTWFP(IND+ISPINOR*NGVECTOR,N,NK,ISP)))
++               KAPPA(NB_GLOBAL,NK,ISP,KAPPA_MAP(NK,KPT))=KAPPA(NB_GLOBAL,NK,ISP,KAPPA_MAP(NK,KPT))+TEMP
++             ENDDO
++           END IF
+          ENDDO
+       ENDDO band
+       ENDDO kpoints
+       ENDDO spin
++
++
++      DEALLOCATE(GVEC_MAP)
++      IF(KCONV) DEALLOCATE(GVEC_NUMBER)
+       CALLMPI( M_sum_d( W%WDES%COMM, KAPPA(1,1,1,1), SIZE(KAPPA)) )
+ 
++
+ !     IF (IU6>=0) THEN
+ !        WRITE(IU6,*) 'KPROJ_THRESHOLD=', KPROJ_THRESHOLD
+ !        WRITE(IU6,*) 
+@@ -805,43 +784,146 @@
+ !     ENDDO
+ !     ENDDO
+       
+-      IF (IU6>=0) THEN
++!      IF (IU6>=0) THEN
++!         OPEN(UNIT=110,FILE=DIR_APP(1:DIR_LEN)//'PRJCAR',STATUS='UNKNOWN')
++!         WRITE(110,'(A)') 'Basis vectors reciprocal space of POSCAR.prim (units of 2pi):'
++!         WRITE(110,'(3F14.7)') LATT_PRIM%B
++!         WRITE(110,'(/A,I6)') 'number of k-points in IBZ of POSCAR.prim:',NKPTS_IRZ
++!         WRITE(110,'(/A)') "             b1            b2            b3      weight"
++!         DO KPT=1,NKPTS_IRZ
++!            WRITE(110,'(I4,3F14.7,3X,I4)') KPT,VKPT_IRZ(:,KPT),INT(WTKPT_IRZ(KPT))
++!         ENDDO
++
++!         DO ISP=1,W%WDES%ISPIN
++!            WRITE(110,'(/A,I4)') 'spin component:',ISP
++!            DO NK=1,W%WDES%NKPTS
++!               WRITE(110,'("k-point (associated with POSCAR):",I6,2X,"vkpt:",3F14.7,2X,"weight:",F14.7)') &
++!              &   NK,W%WDES%VKPT(:,NK),W%WDES%WTKPT(NK)
++!               DO N=1,W%WDES%NB_TOT
++!                  WRITE(110,'("band:",I6,2X,"energy:",F14.7)') N,REAL(W%CELTOT(N,NK,ISP),q)
++!                  I=0
++!                  DO KPT=1,NKPTS_IRZ
++!                     WRITE(110,'(E15.7)',ADVANCE='No') KAPPA(N,NK,ISP,KPT)
++!                     I=I+1; IF (MOD(I,10)==0) WRITE(110,*)
++!                  ENDDO 
++!                  IF (MOD(I,10)/=0) WRITE(110,*)
++!               ENDDO
++!            ENDDO
++!         ENDDO 
++!         CLOSE(110)
++!      ENDIF
++
++
++!=================================================================================================
++!=======================================   Write PRJCAR   ========================================
++!=================================================================================================
++     IF (IU6>=0) THEN
+          OPEN(UNIT=110,FILE=DIR_APP(1:DIR_LEN)//'PRJCAR',STATUS='UNKNOWN')
+-         WRITE(110,'(A)') 'Basis vectors reciprocal space of POSCAR.prim (units of 2pi):'
+-         WRITE(110,'(3F14.7)') LATT_PRIM%B
+-         WRITE(110,'(/A,I6)') 'number of k-points in IBZ of POSCAR.prim:',NKPTS_IRZ
+-         WRITE(110,'(/A)') "             b1            b2            b3      weight"
++         WRITE(110,'(A)') 'Basis vectors of primitive cell in reciprocal space (units of 2pi):'
++         DO N=1,3
++           WRITE(110,'(3F22.16)') LATT_PRIM%B(:,N)
++         END DO
++         WRITE(110,*) ''
++         WRITE(110,'(A)') 'Basis vectors of super cell in reciprocal space (units of 2pi):'
++         DO N=1,3
++           WRITE(110,'(3F22.16)') LATT_CUR%B(:,N)
++         END DO
++         WRITE(110,*) ''
++          WRITE(110,'(A)') "Real space A=M*a transformation Matrix M"
++         DO N=1,3
++           WRITE(110,'(3F22.16)') M_NORM(N,:)
++         END DO
++         WRITE(110,*) ''
++         WRITE(110, '(A)') "Reciprocal space B=M'*b transformations Matrix M'=(M^-1)^T"
++         DO N=1,3
++           WRITE(110, '(3F22.16)') M_INV(:,N)
++         END DO
++         WRITE(110,*) ''
++
++        IF(KCONV)THEN
++         WRITE(110,'(A)',ADVANCE='No') '#KPOINT_PROJECTION_PC=.TRUE.   '
++        ELSE
++         WRITE(110,'(A)',ADVANCE='No') '#KPOINT_PROJECTION_PC=.FALSE.   '
++        END IF
++       IF(SLIM_PRJCAR)THEN
++         WRITE(110,'(A)',ADVANCE='No') '#SLIM_PRJCAR=.TRUE.   '
++        ELSE
++         WRITE(110,'(A)',ADVANCE='No') '#SLIM_PRJCAR=.FALSE.   '
++        END IF
++        IF (KT_EXIST) then
++         WRITE(110,'(A,E12.6)') '#KPROJ_THRESHOLD=',KPROJ_THRESHOLD
++        ELSE
++         WRITE(110,*) '#KPROJ_THRESHOLD=.FALSE.'
++        END IF
++
++         WRITE(110,'(A,I6)') 'number of k-points in '//TRIM(ZONENAME)//' of POSCAR.prim:',NKPTS_IRZ
++         WRITE(110,*) ""
++         WRITE(110,*) " kpt           b1                 b2                 b3        "
+          DO KPT=1,NKPTS_IRZ
+-            WRITE(110,'(I4,3F14.7,3X,I4)') KPT,VKPT_IRZ(:,KPT),INT(WTKPT_IRZ(KPT))
++            WRITE(110,'(I4,3F19.12)') KPT,VKPT_IRZ(:,KPT)
+          ENDDO
++         WRITE(110,*) ''
+ 
+          DO ISP=1,W%WDES%ISPIN
+-            WRITE(110,'(/A,I4)') 'spin component:',ISP
++            WRITE(110,'(A,I4)') 'spin component:',ISP
+             DO NK=1,W%WDES%NKPTS
+                WRITE(110,'("k-point (associated with POSCAR):",I6,2X,"vkpt:",3F14.7,2X,"weight:",F14.7)') &
+               &   NK,W%WDES%VKPT(:,NK),W%WDES%WTKPT(NK)
+                DO N=1,W%WDES%NB_TOT
+-                  WRITE(110,'("band:",I6,2X,"energy:",F14.7)') N,REAL(W%CELTOT(N,NK,ISP),q)
++
++
++                  SUM_KAPPA=0.0_q
++                  DO KPT=1,NKPTS_IRZ
++                    IF (KAPPA_MAP(NK,KPT)==0) CYCLE
++                    SUM_KAPPA=SUM_KAPPA+KAPPA(N,NK,ISP,KAPPA_MAP(NK,KPT))
++                  ENDDO
++                  IF (KT_EXIST) THEN
++                    IF (SUM_KAPPA<KPROJ_THRESHOLD) CYCLE
++                  END IF
++                  WRITE(110,'("band:",I6,2X,"energy:",F14.7,2X,"KAPPAsum:",E15.7)') N,REAL(W%CELTOT(N,NK,ISP),q),SUM_KAPPA
+                   I=0
+                   DO KPT=1,NKPTS_IRZ
+-                     WRITE(110,'(E15.7)',ADVANCE='No') KAPPA(N,NK,ISP,KPT)
+-                     I=I+1; IF (MOD(I,10)==0) WRITE(110,*)
+-                  ENDDO 
++                   IF(KCONV.AND.SLIM_PRJCAR)THEN
++                     CALL KPROJ_CHECK(W%WDES%VKPT(:,NK),VKPT_IRZ(:,KPT),CHOSEN,KSCF)
++                     IF(.NOT.CHOSEN)CYCLE
++                   END IF
++                   IF (KAPPA_MAP(NK,KPT)==0) THEN
++                     IF(SLIM_PRJCAR.OR.KT_EXIST)THEN
++                       CYCLE
++                     ELSE
++                       WRITE(110,'(E15.7)',ADVANCE='No') 0.0_q
++                       I=I+1; IF (MOD(I,10)==0) WRITE(110,*)
++                       CYCLE
++                     END IF
++                   END IF
++                   IF (KT_EXIST) THEN
++                     IF ((KAPPA(N,NK,ISP,KAPPA_MAP(NK,KPT))/SUM_KAPPA)<KPROJ_THRESHOLD) CYCLE
++                   END IF
++                   IF (KT_EXIST.OR.SLIM_PRJCAR) THEN
++                     WRITE(110,'(I4,":",E15.7,1X)',ADVANCE='No') KPT,KAPPA(N,NK,ISP,KAPPA_MAP(NK,KPT))
++                   ELSE
++                     WRITE(110,'(E15.7)',ADVANCE='No') KAPPA(N,NK,ISP,KAPPA_MAP(NK,KPT))
++                   END IF
++                   I=I+1; IF (MOD(I,10)==0) WRITE(110,*)
++                  ENDDO
+                   IF (MOD(I,10)/=0) WRITE(110,*)
+                ENDDO
+             ENDDO
+-         ENDDO 
++         ENDDO
+          CLOSE(110)
+       ENDIF
+ 
++
+       CALL XML_TAG("kpoints", comment="kpoints in IRZ of POSCAR.prim")
+       CALL XML_KPOINTS_LIST(VKPT_IRZ(:,1:NKPTS_IRZ), WTKPT_IRZ(1:NKPTS_IRZ))
+       CALL XML_CLOSE_TAG("kpoints")
+       
+       CALL XML_KPROJ(KAPPA, W%CELTOT, W%FERTOT, W%WDES%NB_TOT, W%WDES%NKPTS, W%WDES%ISPIN, NKPTS_IRZ)
+ 
+-      DEALLOCATE(VKPT, NKPTS_PRIM_INDEX, VKPT_IRZ, WTKPT_IRZ, INDEX_IN_IRZ)
+-      DEALLOCATE(KAPPA)
++      DEALLOCATE( VKPT_IRZ, WTKPT_IRZ)
++
++      IF(LORBIT<10) DEALLOCATE(KAPPA, KAPPA_MAP, VKPT, INDEX_IN_IRZ)
++
+ 
+     END SUBROUTINE KPROJ
+ 
+@@ -857,8 +939,8 @@
+ !
+ !***********************************************************************
+ 
+-      SUBROUTINE IBZKPT_LIST(LATT_CUR, VKPT, NKPTS, VKPT_IRZ, NKPTS_IRZ, INDEX_IN_IRZ, & 
+-           ROTMAP, MAGROT, ISYM, IU6, IU0)
++SUBROUTINE IBZKPT_LIST(LATT_CUR, VKPT, NKPTS, VKPT_IRZ, NKPTS_IRZ, &
++      & INDEX_IN_IRZ, ROTMAP, MAGROT, ISYM, IU6, IU0, KPT_WEIGHT)
+       USE lattice
+       USE mkpoints
+       USE main_mpi
+@@ -1000,7 +1082,133 @@
+             WRITE(IU6,'(1X,3F12.8,F12.3)') VKPT_IRZ(:,NK), KPT_WEIGHT(NK)
+          ENDDO
+       ENDIF
+-    END SUBROUTINE IBZKPT_LIST
++  END SUBROUTINE IBZKPT_LIST
++
++
++!******************** SUBROUTINE CHANGE_BASIS ***************************
++! Write vector according ot a new basis
++!***********************************************************************
++
++SUBROUTINE CHANGE_BASIS(M,A,X)
++  IMPLICIT NONE
++  INTEGER :: I,R
++  REAL(q), DIMENSION(3)     :: A,X
++  REAL(q), DIMENSION(3,3)   :: M
++
++  DO R=1,3
++    X(R)=0.d0
++  ENDDO
++
++  DO R=1,3
++    DO I=1,3
++      X(R)=X(R)+M(R,I)*A(I)
++    ENDDO
++  ENDDO
++
++  RETURN
++END SUBROUTINE CHANGE_BASIS
++
++
++
++
++
++!******************** SUBROUTINE KPROJ_CHECK ***************************
++! Check if KSC point is desired or not
++!***********************************************************************
++
++SUBROUTINE KPROJ_CHECK(KSC,KPC,CHOSEN,KSCF)
++  IMPLICIT NONE
++  REAL(q), DIMENSION(3) :: KSC,KPC
++  REAL(q), DIMENSION(3) :: KSCF,DIFF
++  REAL(q) GOOD
++  LOGICAL CHOSEN
++
++  GOOD=0.000001
++  CHOSEN=.FALSE.
++
++! Conversion of SC K points in PC coordinates
++  CALL CHANGE_BASIS(M_INV,KSC,KSCF)
++  DIFF(1)=dmod(KPC(1)-KSCF(1),1.d0)
++  DIFF(2)=dmod(KPC(2)-KSCF(2),1.d0)
++  DIFF(3)=dmod(KPC(3)-KSCF(3),1.d0)
++
++          IF(DIFF(1)<=(0+GOOD).AND.DIFF(1)>=(0-GOOD) &
++     &  .OR.DIFF(1)<=(1+GOOD).AND.DIFF(1)>=(1-GOOD) &
++     &  .OR.DIFF(1)<=(-1+GOOD).AND.DIFF(1)>=(-1-GOOD)) THEN
++          IF(DIFF(2)<=(0+GOOD).AND.DIFF(2)>=(0-GOOD) &
++     &  .OR.DIFF(2)<=(1+GOOD).AND.DIFF(2)>=(1-GOOD) &
++     &  .OR.DIFF(2)<=(-1+GOOD).AND.DIFF(2)>=(-1-GOOD)) THEN
++          IF(DIFF(3)<=(0+GOOD).AND.DIFF(3)>=(0-GOOD) &
++     &  .OR.DIFF(3)<=(1+GOOD).AND.DIFF(3)>=(1-GOOD) &
++     &  .OR.DIFF(3)<=(-1+GOOD).AND.DIFF(3)>=(-1-GOOD)) THEN
++           CHOSEN=.TRUE.
++          ENDIF
++          ENDIF
++          ENDIF
++ RETURN
++END SUBROUTINE KPROJ_CHECK
++
++
++
++!********************* SUBROUTINE CREATE_POSCAR_PRIM *********************
++!-------------------------------------------------------------------------
++!****** If no POSCAR.prim file exists, create a POSCAR.prim file,  ******-
++!****** or if POSCAR.prim exists, create CONTCAR.prim file with   *******-
++!******************** with accurate lattice vectors *********************-
++!-------------------------------------------------------------------------
++
++SUBROUTINE CREATE_POSCAR_PRIM(IU0,LPPRIM)
++  USE lattice
++  USE main_mpi
++  INTEGER :: N,IU0,UP=321,UC
++  CHARACTER(200) :: STRING
++  LOGICAL :: LPPRIM
++
++  IF ((IU0<0).OR.(.NOT.LKPROJ)) RETURN
++
++  UC=UP+1
++  IF(LPPRIM)THEN
++    OPEN(UNIT=UC,FILE=DIR_APP(1:DIR_LEN)//'POSCAR.prim',STATUS='OLD')
++    OPEN(UNIT=UP,FILE=DIR_APP(1:DIR_LEN)//'CONTCAR.prim',STATUS='REPLACE')
++
++    READ(UC,'(A200)') STRING
++    WRITE(UP,'(A)') TRIM(STRING)
++    WRITE(UP,'(F14.8)') LATT_PRIM%SCALE
++    READ(UC,*)
++    DO N=1,3
++      WRITE(UP,'(3F22.16)') LATT_PRIM%A(:,N)/LATT_PRIM%SCALE
++      READ(UC,*)
++    END DO
++    DO
++      READ(UC,'(A)',ERR=310,END=310) STRING
++      WRITE(UP,'(A)') TRIM(STRING)
++    END DO
++
++  ELSE
++    OPEN(UNIT=UP,FILE=DIR_APP(1:DIR_LEN)//'POSCAR.prim',STATUS='NEW')
++    OPEN(UNIT=UC,FILE=DIR_APP(1:DIR_LEN)//'CONTCAR.prim',STATUS='REPLACE')
++     WRITE(UP,'(A)') 'POSCAR.prim generated from POSCAR and INTMUL'
++     WRITE(UC,'(A)') 'POSCAR.prim generated from POSCAR and INTMUL'
++     WRITE(UP,'(F14.8)') LATT_PRIM%SCALE
++     WRITE(UC,'(F14.8)') LATT_PRIM%SCALE
++     DO N=1,3
++      WRITE(UP,'(3F22.16)') LATT_PRIM%A(:,N)/LATT_PRIM%SCALE
++      WRITE(UC,'(3F22.16)') LATT_PRIM%A(:,N)/LATT_PRIM%SCALE
++     END DO
++     WRITE(UP,'(A)') '# Positions of ions are not required'
++     WRITE(UC,'(A)') '# Positions of ions are not required'
++     CLOSE(UP)
++     CLOSE(UC)
++     WRITE(IU0,*) 'POSCAR.prim and CONTCAR.prim created successfully'
++     RETURN
++  END IF
++
++  310 CLOSE(UP)
++      CLOSE(UC)
++      WRITE(IU0,*) 'CONTCAR.prim file created'
++      RETURN
++
++END SUBROUTINE CREATE_POSCAR_PRIM
+ 
+ 
+ END MODULE mkproj
+Only in src: lattice.F
+Only in src: lattice.inc
+Only in src: lattlib.F
+Only in src: lcao_bare.F
+Only in src: LDApU.F
+Only in src: Lebedev-Laikov.F
+Only in src: lib
+Only in src: linear_optics.F
+Only in src: linear_response.F
+Only in src: linear_response_NMR.F
+Only in src: local_field.F
+Only in src: locproj.F
+Only in src: lr_helper.F
+Only in src: lt_mp2.F
+diff -ru src/main.F src_Upatch/main.F
+--- src/main.F	2021-04-29 20:13:19.000000000 +0200
++++ src_Upatch/main.F	2021-10-01 14:43:54.853954962 +0200
+@@ -247,7 +247,9 @@
+       TYPE (latt)        LATT_CUR
+       TYPE (latt)        LATT_INI
+       TYPE (type_info)   T_INFO
++      TYPE (type_info)   T_INFO_PRIM ! primitive cell
+       TYPE (dynamics)    DYN
++      TYPE (dynamics)    DYN_PRIM
+       TYPE (info_struct) INFO
+       TYPE (in_struct)   IO
+       TYPE (mixing)      MIX
+@@ -405,6 +407,9 @@
+ #ifdef MinimaxTest
+       TYPE(imag_grid_handle) :: IMAG_GRIDS 
+ #endif
++      
++!-----status of POSCAR.prim file and unfolding procedure
++      LOGICAL :: LPPRIM,LKPRIM,LPRIMPOS
+ !=======================================================================
+ ! All COMMON blocks
+ !=======================================================================
+@@ -1001,9 +1006,20 @@
+         &   SYMM%NROT,SYMM%NPTRANS,SYMM%ROTMAP,SYMM%MAGROT,INFO%ISPIN,IO%IU6)
+       END IF
+       
+-      PRIM_CELL = PRIM_CELL_T(LATT_CUR, DYN%POSION, SYMM)
+-      CALL PRIM_CELL%WRITE_OUTCAR(IO)
+-      CALL PRIM_CELL%WRITE_XML(IO)
++
++ 
++!=================================================================================
++!  Setup the primitive cell PRIM_CELL and everything for the unfolding calculation    
++!  Check if unfolding projection method is activated (LKPROJ) and
++!  initialize the primitive cell specific variables
++!  primitive lattice LATT_PRIM, T_INFO_PRIM
++!================================================================================= 
++
++     PRIM_CELL = PRIM_CELL_T(LATT_CUR, DYN%POSION, SYMM)
++     CALL SETUP_KPROJ(IO,LATT_CUR,T_INFO_PRIM,DYN_PRIM,LPPRIM,LKPRIM,LPRIMPOS,PRIM_CELL)
++     CALL PRIM_CELL%WRITE_OUTCAR(IO)
++     CALL PRIM_CELL%WRITE_XML(IO)
++
+ 
+       IF (PHON_DO_POLAR() .OR. ELPH_SETTINGS%DO_POLAR) CALL PHON_CHECK_BORN_CHARGES(PRIM_CELL)
+ 
+@@ -1031,11 +1047,19 @@
+          ENDIF
+       ELSE
+ #ifdef oldsym
+-         CALL SETUP_KPOINTS(KPOINTS,LATT_CUR, &
++        IF(LKPRIM)THEN
++          CALL SETUP_KPOINTS(KPOINTS,LATT_PRIM, &
+             SYMM%ISYM>=0.AND. &
+             .NOT.WDES%LSORBIT.AND. &
+             .NOT.WDES%LSPIRAL, &
+             SYMM%ISYM<0,IO%IU6,IO%IU0)
++        ELSE
++          CALL SETUP_KPOINTS(KPOINTS,LATT_CUR, &
++            SYMM%ISYM>=0.AND. &
++            .NOT.WDES%LSORBIT.AND. &
++            .NOT.WDES%LSPIRAL, &
++            SYMM%ISYM<0,IO%IU6,IO%IU0)
++        END IF
+ 
+          CALL SETUP_FULL_KPOINTS(KPOINTS,LATT_CUR,T_INFO%NIOND, & 
+             SYMM%ROTMAP,SYMM%MAGROT,SYMM%ISYM, &
+@@ -1044,9 +1068,15 @@
+             .NOT.WDES%LSPIRAL, &
+             IO%IU6,IO%IU0,LSYMGRAD)
+ #else
++       IF(LKPRIM)THEN
++         CALL SETUP_KPOINTS(KPOINTS,LATT_PRIM, &
++            SYMM%ISYM>=0.AND..NOT.WDES%LNONCOLLINEAR, &
++            SYMM%ISYM<0,IO%IU6,IO%IU0)
++       ELSE
+          CALL SETUP_KPOINTS(KPOINTS,LATT_CUR, &
+             SYMM%ISYM>=0.AND..NOT.WDES%LNONCOLLINEAR, &
+             SYMM%ISYM<0,IO%IU6,IO%IU0)
++       END IF
+ 
+          CALL SETUP_FULL_KPOINTS(KPOINTS,LATT_CUR,T_INFO%NIOND, & 
+             SYMM%ROTMAP,SYMM%MAGROT,SYMM%ISYM, &
+@@ -1056,6 +1086,8 @@
+       ENDIF
+       CALL SETUP_ORIG_KPOINTS
+ 
++      IF (KCONV) CALL KPROJ_KCONVERTER(LATT_CUR,IO%IU0,IO%IU6,KPOINTS)
++
+ !=======================================================================
+ !  at this point we have enough information to
+ !  create a param.inc file
+@@ -5011,8 +5043,10 @@
+ !=======================================================================
+ !  possibly decompose into Bloch states of a given primitive cell
+ !=======================================================================
+-!     CALL  KPROJ(IO%IU5, IO%IU0, IO%IU6, GRID, NONL_S, T_INFO, SYMM, P, LATT_CUR, KPOINTS, W)
+-      CALL  KPROJ(IO%IU5, IO%IU0, IO%IU6, GRID, LATT_CUR, W, SYMM, CQIJ)
++      IF(LKPROJ)THEN
++        CALL KPROJ(IO%IU5,IO%IU0,IO%IU6,GRID,LATT_CUR,W,SYMM,CQIJ,T_INFO_PRIM,DYN_PRIM,LPRIMPOS,IO%LORBIT)
++        CALL CREATE_POSCAR_PRIM(IO%IU0,LPPRIM)
++      END IF
+ 
+ !=======================================================================
+ !  total DOS, calculate ion and lm decomposed occupancies and dos
+Only in src: main_gpu.F
+Only in src: main_mpi.F
+Only in src: makedeps.awk
+Only in src: makefile
+Only in src: makeparam.F
+Only in src: mathtools.F
+Only in src: metagga.F
+Only in src: mgrid.F
+Only in src: mgrid_struct.F
+Only in src: minimax_dependence.F
+Only in src: minimax.F
+Only in src: minimax_functions1D.F
+Only in src: minimax_functions2D.F
+Only in src: minimax_ini.F
+Only in src: minimax_struct.F
+Only in src: minimax_varpro.F
+Only in src: mix.F
+Only in src: mkpoints_change.F
+diff -ru src/mkpoints.F src_Upatch/mkpoints.F
+--- src/mkpoints.F	2021-04-29 20:13:19.000000000 +0200
++++ src_Upatch/mkpoints.F	2021-10-01 14:43:54.869954880 +0200
+@@ -246,6 +246,11 @@
+         ENDIF
+ #endif
+ 
++! Searching 'p' character
++      IF (CSEL=='P'.OR.CSEL=='p') THEN
++        READ(14,'(A1)',ERR=70111,END=70111) CSEL
++      ENDIF
++
+         ! If CSEL is starting with l for line, k-points are interpolated
+         ! between the points read from KPOINTS
+         IF (CSEL=='L'.OR.CSEL=='l') THEN
+Only in src: mkpoints_full.F
+Only in src: mkpoints_struct.F
+Only in src: ml_interface.F
+Only in src: mlwf.F
+Only in src: mp2.F
+Only in src: mpi.F
+Only in src: mpi_gpu.F
+Only in src: mpi_shmem.F
+Only in src: m_unirnk.F
+Only in src: mymath.F
+Only in src: nccl2for.F
+Only in src: nl_struct.F
+Only in src: nl_struct_gpu.F
+Only in src: nmr.F
+Only in src: nonl.F
+Only in src: nonl_high.F
+Only in src: nonl_high_gpu.F
+Only in src: nonlr.F
+Only in src: nonlr_gpu.F
+Only in src: npt_dynamics.F
+diff -ru src/.objects src_Upatch/.objects
+--- src/.objects	2021-04-29 20:13:18.000000000 +0200
++++ src_Upatch/.objects	2021-10-01 14:43:54.872954865 +0200
+@@ -100,9 +100,8 @@
+ 	hamil_rot.o \
+ 	chain.o \
+ 	dyna.o \
+-	fileio.o \
++        fileio.o \
+ 	vhdf5.o \
+-	sphpro.o \
+ 	us.o \
+ 	core_rel.o \
+ 	aedens.o \
+@@ -138,6 +137,7 @@
+ 	nmr.o \
+ 	pead.o \
+ 	k-proj.o \
++        sphpro.o \
+ 	subrot.o \
+ 	subrot_scf.o \
+ 	paircorrection.o \
+@@ -368,7 +368,6 @@
+ 	stufak.o \
+ 	fileio.o \
+ 	vhdf5.o \
+-	sphpro.o \
+ 	opergrid.o \
+ 	stepver.o \
+ 	chgloc.o \
+@@ -390,6 +389,7 @@
+ 	nmr.o \
+ 	pead.o \
+ 	k-proj.o \
++        sphpro.o \
+ 	subrot_gpu.o \
+ 	subrot_scf.o \
+ 	paircorrection.o \
+Only in src: openacc.F
+Only in src: openacc_struct.F
+Only in src: openmp.F
+Only in src: opergrid.F
+Only in src: optics.F
+Only in src: optreal.F
+Only in src: pade_fit.F
+Only in src: paircorrection.F
+Only in src: param.inc
+Only in src: pardens.F
+Only in src: parsD3.inc
+Only in src: parser
+Only in src: paw_base.F
+Only in src: paw.F
+Only in src: pawfock.F
+Only in src: pawlhf.F
+Only in src: pawsym.F
+Only in src: pead.F
+Only in src: phonon.F
+Only in src: phonon_struct.F
+Only in src: pm.inc
+diff -ru src/poscar.F src_Upatch/poscar.F
+--- src/poscar.F	2021-04-29 20:13:18.000000000 +0200
++++ src_Upatch/poscar.F	2021-10-01 14:43:54.865954901 +0200
+@@ -1399,4 +1399,506 @@
+ 
+       END SUBROUTINE
+ 
++
++
++
++
++
++
++
++!============================================================== 
++!************************* POSCAR.prim ************************
++!============================================================== 
++
++
++
++!=======================================================================
++!  Read UNIT=15: POSCAR.prim file scan for total number of ions
++!  and number of types
++!  only T_INFO%NITYP is allocated at this point
++!  all other arrays are allocated in RD_POSCAR
++!=======================================================================
++
++      SUBROUTINE RD_POSCAR_PRIM_HEAD(LATT_PRIM, T_INFO_PRIM, &
++     &           NIOND,NIONPD, NTYPD,NTYPPD, IU0, IU6, LPPRIM)
++      USE prec
++      USE lattice
++      USE main_mpi
++      USE tutor, ONLY: vtutor
++
++
++      IMPLICIT NONE
++
++      INTEGER NIOND,NIONPD,NTYPPD,NTYPD
++      INTEGER IU0,IU6
++
++      TYPE (latt)::       LATT_PRIM
++      TYPE (type_info) :: T_INFO_PRIM
++      INTEGER NITYP(10000)          ! hard limit 10000 ions :->
++      CHARACTER (LEN=2) TYPE(10000) ! type information
++! temporary varibales
++      CHARACTER (1)    CHARAC
++      CHARACTER (255)  INPLIN,INPWRK
++      INTEGER        NI,I,NT,NSCALE,IOERR
++      REAL(q)        SCALEX,SCALEY,SCALEZ
++      INTEGER, EXTERNAL :: NITEMS
++      LOGICAL :: LPPRIM
++
++! File check
++      INQUIRE (FILE=DIR_APP(1:DIR_LEN)//'POSCAR.prim', EXIST=LPPRIM,IOSTAT=IOERR)
++      IF ((.NOT.LPPRIM).OR.(IOERR/=0)) THEN
++        LPPRIM=.FALSE.
++        RETURN
++      END IF
++! File exists
++      LPPRIM=.TRUE.
++
++! Now extract from file POSCAR.prim how many ion types we have ...
++      OPEN(UNIT=15,FILE=DIR_APP(1:DIR_LEN)//'POSCAR.prim',STATUS='OLD',ERR=1000)
++
++      READ(15,'(A1)',ERR=147,END=147) CHARAC
++
++! one scaling parameter or one for x, y and z
++      READ(15,'(A)',ERR=147,END=147) INPLIN
++! how many words/data items? --> number of ion types on file POSCAR!
++      NSCALE=NITEMS(INPLIN,INPWRK,.TRUE.,'F')
++      IF (NSCALE==1) THEN
++         READ(INPLIN,*) LATT_PRIM%SCALE
++         SCALEX=1
++         SCALEY=1
++         SCALEZ=1
++      ELSE IF (NSCALE==3) THEN
++         LATT_PRIM%SCALE=1
++         READ(INPLIN,*) SCALEX,SCALEY,SCALEZ
++      ELSE
++         CALL vtutor%error("ERROR: there must be 1 or 3 items on line 2 of POSCAR.prim")
++      ENDIF
++
++      DO I=1,3
++        READ(15,*,ERR=147,END=147) LATT_PRIM%A(1,I),LATT_PRIM%A(2,I),LATT_PRIM%A(3,I)
++      ENDDO
++
++      IF (LATT_PRIM%SCALE<0._q) THEN
++!----alternatively give a volume (=abs(scale)) and adjust the lengths of
++!----the three lattice vectors to get the correct desired volume ... :
++         CALL LATTIC(LATT_PRIM)
++         LATT_PRIM%SCALE=(ABS(LATT_PRIM%SCALE) &
++     &                 / ABS(LATT_PRIM%OMEGA))**(1._q/3._q)
++      ENDIF
++
++      LATT_PRIM%A(1,:) =LATT_PRIM%A(1,:)*SCALEX*LATT_PRIM%SCALE
++      LATT_PRIM%A(2,:) =LATT_PRIM%A(2,:)*SCALEY*LATT_PRIM%SCALE
++      LATT_PRIM%A(3,:) =LATT_PRIM%A(3,:)*SCALEZ*LATT_PRIM%SCALE
++
++      CALL LATTIC(LATT_PRIM)
++
++      IF (LATT_PRIM%OMEGA<0) THEN
++        CALL vtutor%error("ERROR: the triple product of the basis vectors is negative exchange two &
++           &basis vectors")
++      ENDIF
++
++! 6th line, contains either the number of ions, their type, a comment or the file ends
++      READ(15,'(A)',ERR=147,END=147) INPLIN
++! how many words/data items? --> number of ion types on file POSCAR!
++      READ(INPLIN,*,ERR=147,END=147) CHARAC
++
++write(iu0,*) 'charac =',charac
++
++      IF (CHARAC=='#') THEN
++        REWIND 15
++        CLOSE(15)
++
++        NIOND =T_INFO_PRIM%NIONS
++        NTYPD =T_INFO_PRIM%NTYP
++        NIONPD=T_INFO_PRIM%NIONP
++        NTYPPD=T_INFO_PRIM%NTYPP
++
++        ALLOCATE(T_INFO_PRIM%NITYP(NTYPPD),T_INFO_PRIM%TYPE(NTYPPD))
++
++        T_INFO_PRIM%NITYP(1:NTYPPD)=NITYP(1:NTYPPD)
++        T_INFO_PRIM%TYPE(1:NTYPPD) =TYPE (1:NTYPPD)
++
++        IF (IU0>=0) &
++        WRITE(IU0,*) ' POSCAR.prim found : no specifications of ions'
++
++        RETURN
++      END IF
++
++      IF (.NOT.(CHARAC>='0' .AND. CHARAC<='9')) THEN
++         T_INFO_PRIM%NTYP=NITEMS(INPLIN,INPWRK,.TRUE.,'A')
++         READ(INPLIN,*,ERR=147,END=147) (TYPE(NI),NI=1,T_INFO_PRIM%NTYP)
++         IF (IU0>=0) THEN
++            WRITE(IU0,'(A,20A3)') ' POSCAR.prim found type information on POSCAR ',TYPE(1:T_INFO_PRIM%NTYP)
++         ENDIF
++
++         READ(15,'(A)',ERR=147,END=147) INPLIN
++         IF (T_INFO_PRIM%NTYP/=NITEMS(INPLIN,INPWRK,.TRUE.,'I')) THEN
++            CALL vtutor%error("ERROR: the type information is not consistent with the number of types")
++         ENDIF
++      ELSE
++         T_INFO_PRIM%NTYP=NITEMS(INPLIN,INPWRK,.TRUE.,'I')
++         TYPE(1:T_INFO_PRIM%NTYP+1)='  '
++      ENDIF
++
++      T_INFO_PRIM%NTYPP=T_INFO_PRIM%NTYP
++! let me know how many ions
++      READ(INPLIN,*,ERR=147,END=147) (NITYP(NI),NI=1,T_INFO_PRIM%NTYP)
++! how many ions do we have on file POSCAR ... ?
++      T_INFO_PRIM%NIONS=0
++      DO NI=1,T_INFO_PRIM%NTYP
++         T_INFO_PRIM%NIONS=T_INFO_PRIM%NIONS+NITYP(NI)
++      END DO
++
++! there might be empty spheres scan for them
++
++      T_INFO_PRIM%NIONP=T_INFO_PRIM%NIONS
++      T_INFO_PRIM%NTYPP=T_INFO_PRIM%NTYP
++
++      READ(15,'(A1)',ERR=147,END=147) CHARAC
++      IF ((CHARAC=='S').OR.(CHARAC=='s')) &
++     &   READ(15,'(A1)',ERR=147,END=147) CHARAC
++      DO NI=1,T_INFO_PRIM%NIONS
++         READ(15,'(A1)',ERR=147,END=147) CHARAC
++      END DO
++
++      READ(15,'(A1)',ERR=147,END=147) CHARAC
++      IF ((CHARAC=='E').OR.(CHARAC=='e')) THEN
++! this is also important for us ...
++         READ(15,'(A)',ERR=147,END=147) INPLIN
++! how many words/data items? --> number of empty sphere types!
++         T_INFO_PRIM%NTYPP=T_INFO_PRIM%NTYPP+NITEMS(INPLIN,INPWRK,.TRUE.,'I')
++         READ(INPLIN,*) (NITYP(NT),NT=T_INFO_PRIM%NTYP+1,T_INFO_PRIM%NTYPP)
++         DO NT=T_INFO_PRIM%NTYP+1,T_INFO_PRIM%NTYPP
++           T_INFO_PRIM%NIONP=T_INFO_PRIM%NIONP+NITYP(NT)
++         ENDDO
++         TYPE(T_INFO_PRIM%NTYP+1:T_INFO_PRIM%NTYPP)='  '
++      ENDIF
++! ... precise details later in the program ...
++  147 REWIND 15
++! set the require allocation parameters
++
++      NIOND =T_INFO_PRIM%NIONS
++      NTYPD =T_INFO_PRIM%NTYP
++      NIONPD=T_INFO_PRIM%NIONP
++      NTYPPD=T_INFO_PRIM%NTYPP
++
++      ALLOCATE(T_INFO_PRIM%NITYP(NTYPPD),T_INFO_PRIM%TYPE(NTYPPD))
++
++      T_INFO_PRIM%NITYP(1:NTYPPD)=NITYP(1:NTYPPD)
++      T_INFO_PRIM%TYPE(1:NTYPPD) =TYPE (1:NTYPPD)
++
++      IF (IU0>=0) &
++      WRITE(IU0,1) DIR_APP(1:DIR_LEN),NTYPPD,NIONPD
++
++    1 FORMAT(' ',A,'POSCAR.prim found : ',I2,' types and ',I4,' ions' )
++
++      CLOSE(UNIT=15)
++      RETURN
++ 1000 CONTINUE
++!
++! all nodes report to unit 6 which have IU6 defined
++! (guarantees that a sensible error message is allways written out)
++!
++      CALL vtutor%error("ERROR: the following files does not exist " // DIR_APP(1:DIR_LEN) // &
++         " POSCAR.prim")
++      END SUBROUTINE
++
++
++
++
++
++
++!=======================================================================
++!
++!  Read UNIT=15: POSCAR Startjob and Continuation-job
++!
++!=======================================================================
++
++      SUBROUTINE RD_POSCAR_PRIM(LATT_CUR, T_INFO, DYN, &
++     &           NIOND,NIONPD, NTYPD,NTYPPD, &
++     &           IU0,IU6,LPRIMPOS)
++      USE prec
++      USE lattice
++      USE main_mpi
++      USE string, ONLY: str
++      USE tutor, ONLY: vtutor
++
++      IMPLICIT NONE
++
++      INTEGER NIOND,NIONPD,NTYPPD,NTYPD
++      CHARACTER (255)  INPLIN,INPWRK
++      INTEGER, EXTERNAL :: NITEMS
++      TYPE (latt)::       LATT_CUR
++      TYPE (type_info) :: T_INFO
++      TYPE (dynamics)  :: DYN
++      INTEGER IU0,IU6        ! io unit
++! temporary
++      CHARACTER (1)  CSEL
++      INTEGER I,NT,NI,NSCALE,IOERR
++      REAL(q) SCALEX,SCALEY,SCALEZ
++      REAL(q) POTIMR
++      LOGICAL :: LPRIMPOS
++
++      OPEN(UNIT=15,FILE=DIR_APP(1:DIR_LEN)//'POSCAR.prim',STATUS='OLD')
++
++      IF (IU6>=0) WRITE(IU6,*)
++!-----Basis vectors and scaling parameter ('lattice constant')
++      READ(15,'(A40)') T_INFO%SZNAM2
++      IF (IU6>=0) WRITE(IU6,*)'POSCAR.prim: ',T_INFO%SZNAM2
++
++! one scaling parameter or one for x, y and z
++      READ(15,'(A)') INPLIN
++! how many words/data items? --> number of ion types on file POSCAR!
++      NSCALE=NITEMS(INPLIN,INPWRK,.TRUE.,'F')
++      IF (NSCALE==1) THEN
++         READ(INPLIN,*) LATT_CUR%SCALE
++         SCALEX=1
++         SCALEY=1
++         SCALEZ=1
++      ELSE IF (NSCALE==3) THEN
++         LATT_CUR%SCALE=1
++         READ(INPLIN,*) SCALEX,SCALEY,SCALEZ
++      ELSE
++         CALL vtutor%error("ERROR: there must be 1 or 3 items on line 2 of POSCAR.prim")
++      ENDIF
++
++      DO I=1,3
++        READ(15,*) LATT_CUR%A(1,I),LATT_CUR%A(2,I),LATT_CUR%A(3,I)
++      ENDDO
++
++      IF (LATT_CUR%SCALE<0._q) THEN
++!----alternatively give a volume (=abs(scale)) and adjust the lengths of
++!----the three lattice vectors to get the correct desired volume ... :
++         CALL LATTIC(LATT_CUR)
++         LATT_CUR%SCALE=(ABS(LATT_CUR%SCALE)  &
++     &                 / ABS(LATT_CUR%OMEGA))**(1._q/3._q)
++      ENDIF
++
++      LATT_CUR%A(1,:) =LATT_CUR%A(1,:)*SCALEX*LATT_CUR%SCALE
++      LATT_CUR%A(2,:) =LATT_CUR%A(2,:)*SCALEY*LATT_CUR%SCALE
++      LATT_CUR%A(3,:) =LATT_CUR%A(3,:)*SCALEZ*LATT_CUR%SCALE
++
++      CALL LATTIC(LATT_CUR)
++
++      IF (LATT_CUR%OMEGA<0) THEN
++        CALL vtutor%error("ERROR: the triple product of the basis vectors is negative exchange two &
++           &basis vectors")
++      ENDIF
++
++      T_INFO%NIOND =NIOND
++      T_INFO%NIONPD=NIONPD
++      T_INFO%NTYPD =NTYPD
++      T_INFO%NTYPPD=NTYPPD
++      ALLOCATE(T_INFO%LSFOR(3,NIOND),T_INFO%ITYP(NIOND))
++
++      T_INFO%LSFOR=.TRUE.
++
++!-----number of atoms per type
++      READ(15,'(A)',ERR=400,END=400) INPLIN
++
++      READ(INPLIN,*,ERR=400,END=400) CSEL
++
++
++      IF (CSEL=='#') THEN
++          IF(IU0>=0) WRITE(IU0,*)' POSCAR.prim read sucessfully'
++          CLOSE(UNIT=15)
++          RETURN
++      END IF
++
++
++      IF (.NOT.(CSEL>='0' .AND. CSEL<='9')) THEN
++         READ(INPLIN,*) (T_INFO%TYPE(NI),NI=1,T_INFO%NTYP)
++         READ(15,'(A)') INPLIN
++         IF (T_INFO%NTYP/=NITEMS(INPLIN,INPWRK,.TRUE.,'I')) THEN
++            CALL vtutor%error("ERROR: the type information is not consistent with the number of types")
++         ENDIF
++      ENDIF
++
++      READ(INPLIN,*,ERR=400,END=400) (T_INFO%NITYP(NT),NT=1,T_INFO%NTYP)
++!---- Set up the table from which we get type of each ion
++      NI=1
++      DO NT=1,T_INFO%NTYP
++      DO NI=NI,T_INFO%NITYP(NT)+NI-1
++        T_INFO%ITYP(NI)=NT
++      ENDDO
++      ENDDO
++!
++!   positions
++!
++      T_INFO%NIONS=0
++      DO NT=1,T_INFO%NTYP
++      T_INFO%NIONS= T_INFO%NIONS+ T_INFO%NITYP(NT)
++      ENDDO
++
++      T_INFO%NIONP=T_INFO%NIONS
++
++      IF (T_INFO%NIONS>NIOND) THEN
++        CALL vtutor%error("ERROR: MAIN: increase NIOND " // str(T_INFO%NIONS))
++      ENDIF
++
++      READ(15,'(A1)',ERR=400,END=400) CSEL
++      T_INFO%LSDYN=((CSEL=='S').OR.(CSEL=='s'))
++      IF (T_INFO%LSDYN) READ(15,'(A1)') CSEL
++      IF (CSEL=='K'.OR.CSEL=='k'.OR. &
++     &    CSEL=='C'.OR.CSEL=='c') THEN
++        CSEL='K'
++        IF (IU6>=0) &
++        WRITE(IU6,*)' positions in cartesian coordinates'
++
++        T_INFO%LDIRCO=.FALSE.
++      ELSE
++        IF (IU6>=0) &
++        WRITE(IU6,*)' positions in direct lattice'
++        T_INFO%LDIRCO=.TRUE.
++      ENDIF
++      ALLOCATE(DYN%POSION(3,NIONPD),DYN%POSIOC(3,NIONPD), &
++     &         DYN%D2C(3,NIOND), &
++     &         DYN%VEL(3,NIOND),DYN%D2(3,NIOND),DYN%D3(3,NIOND))
++
++! alias T_INFO%POSION
++      T_INFO%POSION => DYN%POSION
++      DYN%POSION=0
++      DYN%VEL   =0
++      DYN%D2    =0
++      DYN%D2C   =0
++      DYN%D3    =0
++
++      DO NI=1,T_INFO%NIONS
++      IF (T_INFO%LSDYN) THEN
++      READ(15,*,ERR=400,END=400) DYN%POSION(1,NI),DYN%POSION(2,NI),DYN%POSION(3,NI), &
++     &      T_INFO%LSFOR(1,NI),T_INFO%LSFOR(2,NI),T_INFO%LSFOR(3,NI)
++      ELSE
++      READ(15,*,ERR=400,END=400) DYN%POSION(1,NI),DYN%POSION(2,NI),DYN%POSION(3,NI)
++      ENDIF
++      ENDDO
++
++      IF (CSEL=='K') THEN
++        DYN%POSION(1,:)=LATT_CUR%SCALE*DYN%POSION(1,:)*SCALEX
++        DYN%POSION(2,:)=LATT_CUR%SCALE*DYN%POSION(2,:)*SCALEY
++        DYN%POSION(3,:)=LATT_CUR%SCALE*DYN%POSION(3,:)*SCALEZ
++
++        CALL KARDIR(T_INFO%NIONS,DYN%POSION,LATT_CUR%B)
++      ENDIF
++      CALL TOPRIM(T_INFO%NIONS,DYN%POSION)
++      DYN%POSIOC=DYN%POSION
++
++      LPRIMPOS=.TRUE.
++      DYN%INIT=0
++      DYN%SNOSE(1)=1
++!
++!   empty spheres
++!
++      READ(15,'(A1)',ERR=424,END=410) CSEL
++  424 IF ((CSEL=='E').OR.(CSEL=='e')) THEN
++        IF (T_INFO%NTYPP>NTYPPD) THEN
++         CALL vtutor%error("ERROR: MAIN: increase NEMPTY " // str(T_INFO%NTYPP-T_INFO%NTYP))
++        ENDIF
++        READ(15,*,ERR=410,END=410) (T_INFO%NITYP(NT),NT=T_INFO%NTYP+1,T_INFO%NTYPP)
++        DO NT=T_INFO%NTYP+1,T_INFO%NTYPP
++          T_INFO%NIONP=T_INFO%NIONP+T_INFO%NITYP(NT)
++        ENDDO
++        IF (T_INFO%NIONP>NIONPD) THEN
++         CALL vtutor%error("ERROR: MAIN: increase NEMPTY " // str(T_INFO%NIONP-T_INFO%NIONS))
++        ENDIF
++        T_INFO%NIONP=T_INFO%NIONP
++
++        DO NI=T_INFO%NIONS+1,T_INFO%NIONP
++         READ(15,*,ERR=410,END=410) &
++     &      DYN%POSION(1,NI),DYN%POSION(2,NI),DYN%POSION(3,NI)
++        ENDDO
++        IF (.NOT.T_INFO%LDIRCO) THEN
++          DO NI=T_INFO%NIONS+1,T_INFO%NIONP
++            DYN%POSION(1,NI)=LATT_CUR%SCALE*DYN%POSION(1,NI)*SCALEX
++            DYN%POSION(2,NI)=LATT_CUR%SCALE*DYN%POSION(2,NI)*SCALEY
++            DYN%POSION(3,NI)=LATT_CUR%SCALE*DYN%POSION(3,NI)*SCALEZ
++            CALL KARDIR(1,DYN%POSION(1:3,NI),LATT_CUR%B)
++          ENDDO
++        ENDIF
++        READ(15,'(A1)',ERR=425,END=410) CSEL
++      ENDIF
++      DYN%POSIOC=DYN%POSION
++
++  425 IF (CSEL=='K'.OR.CSEL=='k'.OR.CSEL==' ' &
++     &    .OR.CSEL=='C'.OR.CSEL=='c') THEN
++        CSEL='K'
++        IF (IU6>=0) &
++        WRITE(IU6,*)' velocities in cartesian coordinates'
++      ELSE
++        IF (IU6>=0) &
++        WRITE(IU6,*)' velocities in direct lattice'
++      ENDIF
++
++!
++!-----if we have velocities, read them in and transform from
++!     cartesian coordinates to direct lattice
++      DO NI=1,T_INFO%NIONS
++        READ(15,*,ERR=410,END=410)  &
++     &            DYN%VEL(1,NI),DYN%VEL(2,NI),DYN%VEL(3,NI)
++        !tb start
++        IF (CSEL=='K' .AND. DYN%IBRION/=44 ) THEN
++        !IF (CSEL=='K') THEN
++        !tb end
++        CALL  KARDIR(1,DYN%VEL(1:3,NI),LATT_CUR%B)
++        DYN%VEL(1:3,NI)=DYN%VEL(1:3,NI)*DYN%POTIM
++        ENDIF
++      ENDDO
++
++!
++!-----try to read in predictor Coordinates
++!
++      READ(15,*,ERR=430,END=430)
++      READ(15,*,ERR=430,END=430) DYN%INIT
++
++!-----if INIT is there and it is 1 we have predictor-coordinates on the
++!-----file so we can start with them
++      IF (DYN%INIT==0) GOTO 430
++      READ(15,*) POTIMR
++      IF (POTIMR/=DYN%POTIM) THEN
++        IF (IU6>=0) THEN
++           WRITE(IU6,*)
++           WRITE(IU6,*)' There are predictor-coordinates on the file.'
++           WRITE(IU6,*)' we can''t use them due to change of POTIM!'
++        ENDIF
++        GOTO 430
++      ENDIF
++
++!-----Read in Nose-Parameter
++      READ(15,*) DYN%SNOSE
++!-----Read in predictor-coordinates (always in direct lattice)
++      READ(15,*) (DYN%POSION(1,NI),DYN%POSION(2,NI),DYN%POSION(3,NI),NI=1,T_INFO%NIONS)
++      READ(15,*) (DYN%D2(1,NI),DYN%D2(2,NI),DYN%D2(3,NI),NI=1,T_INFO%NIONS)
++      READ(15,*) (DYN%D3(1,NI),DYN%D3(2,NI),DYN%D3(3,NI),NI=1,T_INFO%NIONS)
++      IF (IU6>=0) THEN
++         WRITE(IU6,*)
++         WRITE(IU6,*)' Using predictor-coordinates on the file'
++      ENDIF
++
++      CLOSE(UNIT=15)
++      RETURN
++!-----------------------------------------------------------------------
++!  Reading Inputfile 15 finished
++!  if you end up at 430  INIT is set to 0,
++!    INIT is used in the call to STEP  (predictors are not initialised)
++!    in that way we tell STEP that it must initialize everything for us
++!----------------------------------------------------------------------
++  400 CONTINUE
++      IF(IU0>=0) WRITE(IU0,*)' POSCAR.prim read sucessfully'
++      CLOSE(UNIT=15)
++      RETURN
++
++  410 CONTINUE
++      DYN%INIT=-1
++      IF (IU6>=0) &
++      WRITE(IU6,*)' No initial velocities read in'
++
++      CLOSE(UNIT=15)
++      RETURN
++
++  430 DYN%INIT=0
++      CLOSE(UNIT=15)
++      RETURN
++
++      END SUBROUTINE
++
++
+       END MODULE
+Only in src: poscar_struct.F
+Only in src: potex1.F
+Only in src: potex2.F
+Only in src: pot.F
+Only in src: pot_gpu.F
+Only in src: profiling.F
+Only in src: pseudo.F
+Only in src: pseudo_struct.F
+Only in src: pwlhf.F
+Only in src: radial.F
+Only in src: radial_struct.F
+Only in src: random.F
+Only in src: ratpol.F
+Only in src: reader_base.F
+Only in src: reader_base.inc
+Only in src: reader.F
+Only in src: README
+Only in src: relativistic.F
+Only in src: rhfatm.F
+Only in src: rmm-diis.F
+Only in src: rmm-diis_gpu.F
+Only in src: rmm-diis_lr.F
+Only in src: rmm-diis_mlr.F
+Only in src: rnd_orb_mp2.F
+Only in src: root_find.F
+Only in src: rot.F
+Only in src: rpa_force.F
+Only in src: rpax.F
+Only in src: scala.F
+Only in src: scpc.F
+Only in src: screened_2e.F
+Only in src: setex.F
+Only in src: setex_struct.F
+Only in src: setlocalpp.F
+Only in src: shm.F
+Only in src: simd.F
+Only in src: simd.inc
+Only in src: smart_allocate.F
+Only in src: solvation.F
+diff -ru src/sphpro.F src_Upatch/sphpro.F
+--- src/sphpro.F	2021-04-29 20:13:19.000000000 +0200
++++ src_Upatch/sphpro.F	2021-10-01 14:43:54.861954921 +0200
+@@ -1054,6 +1054,7 @@
+       USE poscar
+       USE pseudo
+       USE nonl
++      USE mkproj
+       USE string, ONLY: str
+       USE tutor, ONLY: vtutor
+ #ifdef VASP_HDF5
+@@ -1107,6 +1108,14 @@
+       REAL(q) :: EV(NDMAT,NDMAT), OCC(NDMAT,NDMAT)
+       INTEGER :: NSET_OPTPROJ(T_INFO%NTYP, LDIMP)
+ 
++!-----PROCAR.prim variables
++      LOGICAL :: CHOSEN
++      INTEGER :: IUPprim, KPT_IRZ, KPT_PRIM
++      REAL(q), dimension(3) :: KSCF
++
++      IUPprim=IUP+1
++
++
+       PROFILING_START('sphpro_fast')
+ 
+       LFINAL = NSTEP == FINAL_STEP
+@@ -1128,16 +1137,23 @@
+ !   write header fo file PROCAR and 
+       IF (LFINAL) THEN
+          OPEN(UNIT=IUP,FILE=DIR_APP(1:DIR_LEN)//'PROCAR',STATUS='UNKNOWN')
++IF(LKPROJ.AND.KCONV) OPEN(UNIT=IUPprim,FILE=DIR_APP(1:DIR_LEN)//'PROCAR.prim',RECL=300,STATUS='UNKNOWN')
+          IF (LORBIT==11) THEN
+             WRITE(IUP,'(A)')'PROCAR lm decomposed'
++            IF(LKPROJ.AND.KCONV) WRITE(IUPprim,'(A)')'PROCAR.prim lm decomposed'
+          ELSE  IF (LORBIT==12) THEN
+             WRITE(IUP,'(A)')'PROCAR lm decomposed + phase'
++            IF(LKPROJ.AND.KCONV) WRITE(IUPprim,'(A)')'PROCAR.prim lm decomposed + phase'
+          ELSE  IF (LORBIT==13) THEN
+             WRITE(IUP,'(A)')'PROCAR lm decomposed + phase; optimize projector for each state'
++IF(LKPROJ.AND.KCONV) WRITE(IUPprim,'(A)')'PROCAR.prim lm decomposed + phase; optimize projector for each state'
+          ELSE  IF (LORBIT==14) THEN
+             WRITE(IUP,'(A,2F14.7)')'PROCAR lm decomposed + phase; opt. projector for intervall (eV)',EMIN,EMAX
++            IF(LKPROJ.AND.KCONV) WRITE(IUPprim,'(A,2F14.7)') &
++            & 'PROCAR.prim lm decomposed + phase; opt. projector for intervall (eV)',EMIN,EMAX
+          ELSE
+             WRITE(IUP,'(A)')'PROCAR new format'
++            IF(LKPROJ.AND.KCONV) WRITE(IUPprim,'(A)')'PROCAR.prim new format'
+          ENDIF
+       ENDIF
+       io_end
+@@ -1147,7 +1163,6 @@
+             CALL vtutor%bug("internal error in SPHPRO_FAST: optional arguments are missing", __FILE__, __LINE__)
+          ENDIF
+       ENDIF
+-
+       IF (LFINAL) THEN
+          PAR=0
+          IF (LORBIT>=12 .AND. LORBIT<=14) THEN
+@@ -1167,7 +1182,6 @@
+             P(NT)%OPTPROJ=0
+          ENDDO
+       ENDIF
+-
+       ION_SUM=0
+       ION_SUM_DETAIL=0
+ 
+@@ -1240,14 +1254,13 @@
+       ENDDO !ISPINOR
+       ENDDO !ISP
+       ND=WDES%NBANDS*WDES%NKPTS
+-
+       IF (WDES%LNONCOLLINEAR) &
+       CALL C_FLIP(CSUM,ND,ND,WDES%NCDIJ,.FALSE.)
+ 
+       DO ISP=1,WDES%NCDIJ
+       ISP_=MIN(ISP,WDES%ISPIN)
+       DO NK=1 ,WDES%NKPTS
+-#ifdef MPI
++#ifdef MPI<F3>
+       IF (MOD(NK-1,WDES%COMM_KINTER%NCPU).NE.WDES%COMM_KINTER%NODE_ME-1) CYCLE
+ #endif
+       CALL SETWDES(WDES,WDES_1K,NK)
+@@ -1357,6 +1370,7 @@
+             ENDDO
+          ENDIF
+       ENDIF
++
+ !=======================================================================
+ ! determine phase factors (LORBIT>=12 and LORBIT=13)
+ !=======================================================================
+@@ -1456,6 +1470,7 @@
+                         ION_SUM(1,1,2),SYMM%ROTMAP(1,1,1),SYMM%MAGROT(1,1),WDES%SAXIS,LATT_CUR%A,LATT_CUR%B)
+          ENDIF
+       ENDIF
++
+ !=======================================================================
+ !   write optimized projection operators to OUTCAR
+ !=======================================================================
+@@ -1489,7 +1504,6 @@
+ !   write PAR on file PROCAR
+ !=======================================================================
+       IF (LFINAL) THEN
+-
+ #ifdef VASP_HDF5
+          IF (LORBIT==11.OR.LORBIT==12) THEN
+             CALL VH5_WRITE_PROJECTORS(IH5OUTFILEID, T_INFO, WDES, W, LORBIT, LPAR, PAR, LMCHAR, PHAS)
+@@ -1500,25 +1514,54 @@
+       DO ISP=1,WDES%ISPIN
+ 
+       WRITE(IUP,3200) WDES%NKPTS,WDES%NB_TOT,T_INFO%NIONP
++      IF(LKPROJ.AND.KCONV) WRITE(IUPprim,3200) WDES%NKPTS,WDES%NB_TOT,T_INFO%NIONP
++
+       DO NK=1,WDES%NKPTS
++      
++      IF(LKPROJ.AND.KCONV) THEN
++        DO KPT_PRIM=1,NKPTS_PRIM
++         CALL KPROJ_CHECK(WDES%VKPT(:,NK),VKPT(:,KPT_PRIM),CHOSEN,KSCF)
++         IF(CHOSEN) EXIT
++        ENDDO
++        IF(CHOSEN) KPT_IRZ=INDEX_IN_IRZ(KPT_PRIM)
++       ENDIF
++      
+       WRITE(IUP,3201) NK,WDES%VKPT(1,NK),WDES%VKPT(2,NK),WDES%VKPT(3,NK),WDES%WTKPT(NK)
++      IF(LKPROJ.AND.KCONV.AND.CHOSEN) WRITE(IUPprim,3201) NK,KSCF(1),KSCF(2),KSCF(3),WDES%WTKPT(NK)
+       DO NB=1,WDES%NB_TOT
+       NI=1
+ 
+       WRITE(IUP,3203) NB,REAL( W%CELTOT(NB,NK,ISP) ,KIND=q),WDES%RSPIN*W%FERTOT(NB,NK,ISP)
++
++      IF(LKPROJ.AND.KCONV.AND.CHOSEN) THEN
++        WRITE(IUPprim,3203,ADVANCE='No') NB,REAL( W%CELTOT(NB,NK,ISP),KIND=q),WDES%RSPIN*W%FERTOT(NB,NK,ISP)
++        IF(KAPPA_MAP(NK,KPT_IRZ)==0) THEN
++          WRITE(IUPprim,33203) 0.0_q
++        ELSE
++          WRITE(IUPprim,33203) KAPPA(NB,NK,ISP,KAPPA_MAP(NK,KPT_IRZ))
++        ENDIF
++      ENDIF
++
+       WRITE(IUP,*)
++
++      IF(LKPROJ.AND.KCONV.AND.CHOSEN) WRITE(IUPprim,*)
+       
+       WRITE(IUP,'(A3)',ADVANCE='No') "ion"
++      IF(LKPROJ.AND.KCONV.AND.CHOSEN) WRITE(IUPprim,'(A3)',ADVANCE='No') "ion"
++
+       IF (LORBIT>=11 .AND. LORBIT<=14) THEN
+          DO NL=1,LPAR
+             WRITE(IUP,'(A7)',ADVANCE='No') LMCHAR(NL)
++            IF(LKPROJ.AND.KCONV.AND.CHOSEN) WRITE(IUPprim,'(A7)',ADVANCE='No') LMCHAR(NL)
+          ENDDO
+       ELSE
+          DO NL=1,LPAR
+             WRITE(IUP,'(A7)',ADVANCE='No') LCHAR(NL)
++            IF(LKPROJ.AND.KCONV.AND.CHOSEN) WRITE(IUPprim,'(A7)',ADVANCE='No') LCHAR(NL)
+          ENDDO
+       ENDIF
+       WRITE(IUP,'(A7)',ADVANCE='yes') "tot"
++      IF(LKPROJ.AND.KCONV.AND.CHOSEN) WRITE(IUPprim,'(A7)',ADVANCE='yes') "tot"
+ 
+       DO II=0,WDES%NRSPINORS*WDES%NRSPINORS-1
+       PARSUM=0
+@@ -1532,18 +1575,23 @@
+                S=S+SUMION(NL)
+             ENDDO
+          WRITE(IUP,3204) NI,(PAR(NB,NK,NL,NI,ISP+II),NL=1,LPAR),PARSUM
++IF(LKPROJ.AND.KCONV.AND.CHOSEN) WRITE(IUPprim,3204)NI,(PAR(NB,NK,NL,NI,ISP+II),NL=1,LPAR),PARSUM
+       ENDDO
+       IF (T_INFO%NIONP>1) THEN
+          WRITE(IUP,3205) (SUMION(NL),NL=1,LPAR),S
++         IF(LKPROJ.AND.KCONV.AND.CHOSEN) WRITE(IUPprim,3205) (SUMION(NL),NL=1,LPAR),S
+       ENDIF
+       ENDDO
+ 
+       IF (LORBIT>=12 .AND. LORBIT<=14) THEN
+          WRITE(IUP,'(A3)',ADVANCE='No') "ion"
++         IF(LKPROJ.AND.KCONV.AND.CHOSEN) WRITE(IUPprim,'(A3)',ADVANCE='No') "ion"
+          DO NL=1,LMDIMP
+             WRITE(IUP,'(A15)',ADVANCE='No') LMCHAR_LONG(NL)
++            IF(LKPROJ.AND.KCONV.AND.CHOSEN) WRITE(IUPprim,'(A7)',ADVANCE='No') LMCHAR(NL)
+          ENDDO
+          WRITE(IUP,*)
++         IF(LKPROJ.AND.KCONV.AND.CHOSEN) WRITE(IUPprim,*)
+          SUMION=0
+          DO NI=1,T_INFO%NIONP
+ !            WRITE(IUP,3204) NI, (REAL (PHAS(M,NI,NK,NB,ISP)),M=1,LMDIMP)
+@@ -1551,6 +1599,9 @@
+ !            WRITE(IUP,3204) NI, (REAL(PHAS(M,NI,NK,NB,ISP)*CONJG(PHAS(M,NI,NK,NB,ISP))),M=1,LMDIMP), &
+             WRITE(IUP,3214) NI, (PHAS(M,NI,NK,NB,ISP) ,M=1,LMDIMP), &
+                  REAL(SUM(PHAS(1:LMDIMP,NI,NK,NB,ISP)*CONJG(PHAS(1:LMDIMP,NI,NK,NB,ISP))))
++               IF(LKPROJ.AND.KCONV.AND.CHOSEN) WRITE(IUPprim,3214) NI,(PHAS(M,NI,NK,NB,ISP) ,M=1,LMDIMP), &
++               &  REAL(SUM(PHAS(1:LMDIMP,NI,NK,NB,ISP)*CONJG(PHAS(1:LMDIMP,NI,NK,NB,ISP))))
++
+             SUMION(1:LMDIMP)=SUMION(1:LMDIMP)+REAL(PHAS(1:LMDIMP,NI,NK,NB,ISP)*CONJG(PHAS(1:LMDIMP,NI,NK,NB,ISP)))
+          ENDDO
+          IF (T_INFO%NIONP>1) THEN
+@@ -1558,6 +1609,7 @@
+          ENDIF
+       ENDIF
+       WRITE(IUP,*)
++      IF(LKPROJ.AND.KCONV.AND.CHOSEN) WRITE(IUPprim,*)
+ 
+       ENDDO
+       ENDDO
+@@ -1601,6 +1653,7 @@
+  3201 FORMAT(/' k-point ',I5,' :',3X,3F11.8,'     weight = ',F10.8/)
+ 
+  3203 FORMAT('band ',I5,' # energy',F14.8,' # occ.',F12.8)
++33203 FORMAT(' Unfold proj.: ',E15.7)
+ 
+  3204 FORMAT(I5,17(1X,F6.3))
+  3214 FORMAT(I5,17(1X,F6.3,1X,F6.3,1X))
+@@ -1609,8 +1662,12 @@
+ 
+ 
+       do_io CLOSE (IUP)
++      IF(LKPROJ.AND.KCONV) THEN
++       do_io CLOSE (IUPprim)
++      ENDIF
+       IF (IU6>=0) WRITE(IU6,*)
+       IF ((LORBIT==12.OR.LORBIT==13) .AND. LFINAL) DEALLOCATE(PHAS)
++      IF(LKPROJ.AND.KCONV.AND.LFINAL) DEALLOCATE(KAPPA, KAPPA_MAP, VKPT,INDEX_IN_IRZ)
+ 
+       POP_ACC_EXEC_ON
+ 
+Only in src: spinsym.F
+Only in src: steep.F
+Only in src: stepver.F
+Only in src: stm.F
+Only in src: stockholder.F
+Only in src: string.F
+Only in src: stufak.F
+Only in src: subdftd3.F
+Only in src: subdftd4.F
+Only in src: subrot_cluster.F
+Only in src: subrot.F
+Only in src: subrot_gpu.F
+Only in src: subrot_lr.F
+Only in src: subrot_scf.F
+Only in src: sydmat.F
+Only in src: symbol.inc
+Only in src: sym_grad.F
+Only in src: symlib.F
+Only in src: symmetry.F
+Only in src: tet.F
+Only in src: time_propagation.F
+Only in src: tutor.F
+Only in src: twoelectron4o.F
+Only in src: ump2.F
+Only in src: ump2kpar.F
+Only in src: ump2no.F
+Only in src: us.F
+Only in src: vasp.cfg
+Only in src: vdwforcefield.F
+Only in src: vdwforcefield_glb.F
+Only in src: vdw_nl.F
+Only in src: version.F
+Only in src: vhdf5_base.F
+Only in src: vhdf5.F
+Only in src: wannier.F
+Only in src: wannier_interpol.F
+Only in src: wannier_mats.F
+Only in src: wave_cacher.F
+Only in src: wave.F
+Only in src: wave_gpu.F
+Only in src: wave_high.F
+Only in src: wave_high_gpu.F
+Only in src: wave_interpolate.F
+Only in src: wave_mpi.F
+Only in src: wave_mpi_gpu.F
+Only in src: wave_struct.F
+Only in src: wave_struct_gpu.F
+Only in src: wavpre.F
+Only in src: wavpre_noio.F
+Only in src: wavpre_noio_gpu.F
+Only in src: wpot.F
+Only in src: writer.F
+Only in src: xcgrad.F
+Only in src: xcgrad_gpu.F
+Only in src: xclib.F
+Only in src: xclib_grad.F
+Only in src: xclib_grad_gpu.F
+Only in src: xcspin.F
+Only in src: xml.F
+Only in src: xml_writer.F
+Only in src: zgemmtest.F
